@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>柜台接单与打单系统</title>
-  <!-- 替换为稳定高可用的 CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <!-- QZ Tray 静默打印 SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js"></script>
   <style>
     [v-cloak] { display: none !important; }
   </style>
@@ -22,24 +23,29 @@
       <h1 class="text-2xl font-bold flex items-center gap-2">
         <span>🖥️</span> 柜台接单与打单控制台
       </h1>
-      <p class="text-xs text-slate-400 mt-1">状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span></p>
+      <p class="text-xs text-slate-400 mt-1">
+        状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span> | 
+        打印机组件: <span :class="qzConnected ? 'text-green-400 font-bold' : 'text-red-400 font-bold'">{{ qzConnected ? '● 已连接 QZ Tray' : '○ 未连接 QZ' }}</span>
+      </p>
     </div>
-    <div class="flex gap-4">
+    <div class="flex gap-3">
+      <button @click="connectQz" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs shadow">
+        🔌 连接打印机服务
+      </button>
       <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
         🔊 开启接单提示音
       </button>
     </div>
   </header>
 
-  <!-- 错误提示 -->
+  <!-- 错误与状态提示 -->
   <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">
     ❌ {{ errorMessage }}
   </div>
 
-  <!-- 桌台与订单视图 -->
+  <!-- 待处理订单列表 (Pending) -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-    <!-- 待处理订单列表 (Pending) -->
     <div class="md:col-span-2 space-y-4">
       <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
         <span>🔔 待处理订单</span>
@@ -69,15 +75,15 @@
           <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
             <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
             <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              目标: {{ item.printer === 'Bar' ? '水吧 (Bar)' : '后厨 (Kitchen)' }}
+              目标: {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
             </span>
           </div>
         </div>
 
         <!-- 操作按钮 -->
         <div class="flex gap-2 pt-2 border-t border-gray-100">
-          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
-            🖨️ 分单打单 (Bar + Kitchen)
+          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow flex justify-center items-center gap-1">
+            <span>🖨️</span> 自动静默打单 (BAR + KITCHEN)
           </button>
           <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
             ✅ 已出菜
@@ -86,7 +92,7 @@
       </div>
     </div>
 
-    <!-- 桌台状态与快速结账 (Tables) -->
+    <!-- 桌台状态 -->
     <div>
       <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面开桌/结账状态</h2>
       <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
@@ -115,6 +121,10 @@
   const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
+  // Windows 对应的打印机名字
+  const BAR_PRINTER_NAME = "BAR";
+  const KITCHEN_PRINTER_NAME = "KITCHEN";
+
   const { createApp, ref, onMounted } = Vue;
 
   createApp({
@@ -122,6 +132,7 @@
       const pendingOrders = ref([]);
       const tables = ref([]);
       const errorMessage = ref('');
+      const qzConnected = ref(false);
       let audioContext = null;
       let supabaseClient = null;
 
@@ -141,11 +152,24 @@
         osc.stop(audioContext.currentTime + 0.3);
       };
 
+      // 连接 QZ Tray 打印服务
+      const connectQz = async () => {
+        try {
+          if (!window.qz) throw new Error("QZ Tray SDK 未加载");
+          if (!qz.websocket.isActive()) {
+            await qz.websocket.connect();
+          }
+          qzConnected.value = true;
+          console.log("✅ QZ Tray 连接成功");
+        } catch (err) {
+          qzConnected.value = false;
+          console.warn("⚠️ 无法连接 QZ Tray，请确认后台 QZ Tray 软件已开启", err);
+        }
+      };
+
       const initSupabase = () => {
         const supabaseLib = window.supabase || window.supabaseJs;
-        if (!supabaseLib) {
-          throw new Error("Supabase SDK 加载失败，请刷新页面重试！");
-        }
+        if (!supabaseLib) throw new Error("Supabase SDK 加载失败");
         return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
       };
 
@@ -167,7 +191,6 @@
           tables.value = tData || [];
         } catch (err) {
           errorMessage.value = '数据读取失败: ' + err.message;
-          console.error(err);
         }
       };
 
@@ -182,21 +205,59 @@
           .subscribe();
       };
 
-      const printSplitReceipts = (order) => {
+      // 构建热敏打印文本格式
+      const buildReceiptText = (title, tableNo, items) => {
+        let text = `==============================\n`;
+        text += `        ${title}\n`;
+        text += `==============================\n`;
+        text += `桌号: ${tableNo}\n`;
+        text += `时间: ${new Date().toLocaleTimeString()}\n`;
+        text += `------------------------------\n`;
+        items.forEach(item => {
+          text += `${item.name.padEnd(18)} x${item.qty}\n`;
+        });
+        text += `------------------------------\n\n\n\n\n`; // 留空白切纸
+        return text;
+      };
+
+      // 执行静默分单打单
+      const printSplitReceipts = async (order) => {
         const barItems = order.items.filter(i => i.printer === 'Bar');
         const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
 
-        let msg = `【桌号: ${order.table_no} 拆单明细】\n\n`;
-
-        if (barItems.length > 0) {
-          msg += `🥤 [水吧单 -> 发送至 Bar 打印机]:\n` + barItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n') + `\n\n`;
+        if (!qzConnected.value) {
+          await connectQz();
         }
 
-        if (kitchenItems.length > 0) {
-          msg += `🍳 [后厨单 -> 发送至 Kitchen 打印机]:\n` + kitchenItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n');
+        // 如果连不上 QZ Tray，弹窗回退提醒
+        if (!qzConnected.value) {
+          let fallbackMsg = `【未检测到 QZ Tray 后台，显示模拟小票】\n\n`;
+          if (barItems.length > 0) fallbackMsg += `🥤 [BAR 打印机]:\n` + barItems.map(i => `${i.name} x${i.qty}`).join('\n') + `\n\n`;
+          if (kitchenItems.length > 0) fallbackMsg += `🍳 [KITCHEN 打印机]:\n` + kitchenItems.map(i => `${i.name} x${i.qty}`).join('\n');
+          alert(fallbackMsg);
+          return;
         }
 
-        alert(msg);
+        try {
+          // 发送 Bar 单
+          if (barItems.length > 0) {
+            const configBar = qz.configs.create(BAR_PRINTER_NAME);
+            const dataBar = [buildReceiptText("--- 水吧单 (BAR) ---", order.table_no, barItems)];
+            await qz.print(configBar, dataBar);
+          }
+
+          // 发送 Kitchen 单
+          if (kitchenItems.length > 0) {
+            const configKitchen = qz.configs.create(KITCHEN_PRINTER_NAME);
+            const dataKitchen = [buildReceiptText("--- 厨房单 (KITCHEN) ---", order.table_no, kitchenItems)];
+            await qz.print(configKitchen, dataKitchen);
+          }
+
+          alert("✅ 已成功向 BAR 和 KITCHEN 打印机发送出纸指令！");
+        } catch (err) {
+          alert("❌ 打单失败: " + err.message);
+          console.error(err);
+        }
       };
 
       const markAsServed = async (orderId) => {
@@ -214,14 +275,17 @@
       onMounted(() => {
         fetchData();
         subscribeRealtime();
+        connectQz();
       });
 
       return {
         pendingOrders,
         tables,
         errorMessage,
+        qzConnected,
         formatTime,
         enableAudio,
+        connectQz,
         printSplitReceipts,
         markAsServed,
         clearTable
