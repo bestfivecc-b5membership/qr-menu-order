@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>扫码点餐</title>
-  <!-- 替换为高速稳定的 CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.39.8/supabase.umd.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Supabase JS Official SDK (固定版本与双源加载) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     [v-cloak] { display: none !important; }
   </style>
@@ -104,7 +106,6 @@
 </div>
 
 <script>
-  // 正确填入你的凭证
   const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
@@ -133,12 +134,13 @@
 
       const fetchMenu = async () => {
         try {
-          // 初始化 Supabase
-          if (window.supabase) {
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-          } else {
-            throw new Error("Supabase SDK 未能加载，请检查网络条件！");
+          // 容错获取 Supabase 全局对象
+          const supabaseLib = window.supabase || window.supabaseJs;
+          if (!supabaseLib) {
+            throw new Error("SDK 加载超时，请刷新页面重试！");
           }
+
+          supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
 
           const { data, error } = await supabaseClient.from('menu').select('*');
           if (error) throw error;
@@ -149,7 +151,7 @@
             menuList.value = data;
           }
         } catch (err) {
-          errorMessage.value = '加载失败: ' + (err.message || '网络连接异常');
+          errorMessage.value = '连接失败: ' + (err.message || '网络问题');
           console.error(err);
         } finally {
           loading.value = false;
