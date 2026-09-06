@@ -4,13 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>柜台接单与打单系统</title>
+  <!-- 替换为稳定高可用的 CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    [v-cloak] { display: none !important; }
+  </style>
 </head>
 <body class="bg-gray-100 p-6">
 
-<div id="app" class="max-w-6xl mx-auto">
+<div id="app" v-cloak class="max-w-6xl mx-auto">
 
   <!-- 顶部控制栏 -->
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
@@ -26,6 +30,11 @@
       </button>
     </div>
   </header>
+
+  <!-- 错误提示 -->
+  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">
+    ❌ {{ errorMessage }}
+  </div>
 
   <!-- 桌台与订单视图 -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -51,7 +60,7 @@
           </div>
           <div class="text-right">
             <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
-            <div class="text-lg font-bold text-gray-800">Total: RM {{ order.total_amount.toFixed(2) }}</div>
+            <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
           </div>
         </div>
 
@@ -107,17 +116,17 @@
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
   const { createApp, ref, onMounted } = Vue;
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   createApp({
     setup() {
       const pendingOrders = ref([]);
       const tables = ref([]);
+      const errorMessage = ref('');
       let audioContext = null;
+      let supabaseClient = null;
 
       const formatTime = (ts) => new Date(ts).toLocaleTimeString();
 
-      // 音效提醒
       const enableAudio = () => {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         alert('✅ 接单音效已激活！');
@@ -127,33 +136,52 @@
         if (!audioContext) return;
         const osc = audioContext.createOscillator();
         osc.connect(audioContext.destination);
-        osc.frequency.value = 880; // A5 音调
+        osc.frequency.value = 880;
         osc.start();
         osc.stop(audioContext.currentTime + 0.3);
       };
 
-      // 获取桌台与未处理订单
-      const fetchData = async () => {
-        const { data: oData } = await supabase.from('orders').select('*').eq('status', 'Pending').order('created_at', { ascending: false });
-        pendingOrders.value = oData || [];
-
-        const { data: tData } = await supabase.from('tables').select('*');
-        tables.value = tData || [];
+      const initSupabase = () => {
+        const supabaseLib = window.supabase || window.supabaseJs;
+        if (!supabaseLib) {
+          throw new Error("Supabase SDK 加载失败，请刷新页面重试！");
+        }
+        return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
       };
 
-      // 实时监听 Supabase orders 表的新订单插入
+      const fetchData = async () => {
+        try {
+          if (!supabaseClient) supabaseClient = initSupabase();
+
+          const { data: oData, error: oErr } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('status', 'Pending')
+            .order('created_at', { ascending: false });
+
+          if (oErr) throw oErr;
+          pendingOrders.value = oData || [];
+
+          const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
+          if (tErr) throw tErr;
+          tables.value = tData || [];
+        } catch (err) {
+          errorMessage.value = '数据读取失败: ' + err.message;
+          console.error(err);
+        }
+      };
+
       const subscribeRealtime = () => {
-        supabase
+        if (!supabaseClient) return;
+        supabaseClient
           .channel('schema-db-changes')
           .on('postgres_changes', { event: 'INSERT', table: 'orders' }, payload => {
-            playBeep(); // 响铃
-            pendingOrders.value.unshift(payload.new); // 实时加入列表
-            fetchData(); // 刷新桌态
+            playBeep();
+            fetchData();
           })
           .subscribe();
       };
 
-      // 核心拆单打印逻辑
       const printSplitReceipts = (order) => {
         const barItems = order.items.filter(i => i.printer === 'Bar');
         const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
@@ -169,19 +197,16 @@
         }
 
         alert(msg);
-        // 未来连接本地打印代理工具（如 Web-Print-Agent）时，在此处调用静默打印 API 即可。
       };
 
-      // 更新订单为已出菜
       const markAsServed = async (orderId) => {
-        await supabase.from('orders').update({ status: 'Served' }).eq('id', orderId);
+        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
         fetchData();
       };
 
-      // 结账并清空桌号
       const clearTable = async (tableNo) => {
         if (confirm(`确定要为 ${tableNo} 桌结账并重置桌号吗？`)) {
-          await supabase.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
           fetchData();
         }
       };
@@ -194,6 +219,7 @@
       return {
         pendingOrders,
         tables,
+        errorMessage,
         formatTime,
         enableAudio,
         printSplitReceipts,
