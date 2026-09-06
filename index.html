@@ -4,16 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>扫码点餐</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Vue 3 CDN -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <!-- Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- 替换为高速稳定的 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.39.8/supabase.umd.min.js"></script>
+  <style>
+    [v-cloak] { display: none !important; }
+  </style>
 </head>
 <body class="bg-gray-100 pb-24">
 
-<div id="app" class="max-w-md mx-auto min-h-screen bg-white relative shadow-lg">
+<div id="app" v-cloak class="max-w-md mx-auto min-h-screen bg-white relative shadow-lg">
 
   <!-- 顶部 Header -->
   <header class="bg-amber-600 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow">
@@ -26,12 +27,17 @@
     </div>
   </header>
 
-  <!-- 加载中提示 -->
-  <div v-if="loading" class="p-8 text-center text-gray-500">
-    菜单加载中，请稍候...
+  <!-- 错误提示 -->
+  <div v-if="errorMessage" class="p-4 m-4 bg-red-100 border border-red-400 text-red-700 text-sm rounded">
+    ❌ {{ errorMessage }}
   </div>
 
-  <template v-else>
+  <!-- 加载中提示 -->
+  <div v-if="loading && !errorMessage" class="p-8 text-center text-gray-500">
+    ⏳ 菜单加载中，请稍候...
+  </div>
+
+  <template v-if="!loading && !errorMessage">
     <!-- 分类标签页 -->
     <div class="flex overflow-x-auto bg-gray-50 border-b border-gray-200 sticky top-[60px] z-10 p-2 gap-2">
       <button 
@@ -46,15 +52,19 @@
 
     <!-- 菜品列表 -->
     <div class="p-4 space-y-4">
+      <div v-if="filteredMenu.length === 0" class="text-center py-8 text-gray-400">
+        该分类下暂无菜品
+      </div>
+
       <div v-for="item in filteredMenu" :key="item.id" class="flex gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-        <img :src="item.image_url || 'https://via.placeholder.com/100'" class="w-20 h-20 rounded-lg object-cover bg-gray-100" />
+        <img :src="item.image_url || 'https://via.placeholder.com/100?text=Food'" class="w-20 h-20 rounded-lg object-cover bg-gray-100" />
         <div class="flex-1 flex flex-col justify-between">
           <div>
             <h3 class="font-bold text-gray-800">{{ item.name }}</h3>
             <p class="text-xs text-gray-400 line-clamp-1">{{ item.description }}</p>
           </div>
           <div class="flex justify-between items-center mt-2">
-            <span class="text-amber-600 font-bold">RM {{ item.price.toFixed(2) }}</span>
+            <span class="text-amber-600 font-bold">RM {{ Number(item.price).toFixed(2) }}</span>
             <button 
               @click="addToCart(item)"
               :disabled="!item.is_available"
@@ -70,7 +80,7 @@
 
   <!-- 底部购物车 bar -->
   <div v-if="cart.length > 0" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 p-3 flex justify-between items-center shadow-2xl z-20">
-    <div class="flex items-center gap-3" @click="showCartModal = true">
+    <div class="flex items-center gap-3">
       <div class="relative">
         <span class="text-2xl">🛒</span>
         <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
@@ -94,24 +104,25 @@
 </div>
 
 <script>
-  // ⚠️ 请在这里替换你 Supabase 的 Project URL 和 Key ⚠️
-  const SUPABASE_URL = "https://你的SUPABASE项目ID.supabase.co"; 
-const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
+  // 正确填入你的凭证
+  const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
+  const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
   const { createApp, ref, computed, onMounted } = Vue;
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   createApp({
     setup() {
       const menuList = ref([]);
       const loading = ref(true);
       const submitting = ref(false);
+      const errorMessage = ref('');
       const activeCategory = ref('全部');
       const cart = ref([]);
-      const currentTable = ref('A01'); // 默认桌号
-      const orderType = ref('Dine-In'); // 'Dine-In' 堂食 或 'Takeaway' 外带
+      const currentTable = ref('A01');
+      const orderType = ref('Dine-In');
 
-      // 1. 获取 URL 中的桌号 (?table=A01)
+      let supabaseClient = null;
+
       const getTableFromUrl = () => {
         const params = new URLSearchParams(window.location.search);
         const table = params.get('table');
@@ -120,21 +131,31 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
         if (type) orderType.value = type;
       };
 
-      // 2. 从 Supabase 读取菜品数据
       const fetchMenu = async () => {
         try {
-          const { data, error } = await supabase.from('menu').select('*');
+          // 初始化 Supabase
+          if (window.supabase) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+          } else {
+            throw new Error("Supabase SDK 未能加载，请检查网络条件！");
+          }
+
+          const { data, error } = await supabaseClient.from('menu').select('*');
           if (error) throw error;
-          menuList.value = data || [];
+
+          if (!data || data.length === 0) {
+            errorMessage.value = '数据库中尚无菜单数据，请先在 Supabase 添加菜品。';
+          } else {
+            menuList.value = data;
+          }
         } catch (err) {
-          alert('读取菜单失败，请检查网络或 Supabase 配置！');
+          errorMessage.value = '加载失败: ' + (err.message || '网络连接异常');
           console.error(err);
         } finally {
           loading.value = false;
         }
       };
 
-      // 菜单分类计算
       const categories = computed(() => {
         const cats = ['全部', ...new Set(menuList.value.map(i => i.category))];
         return cats;
@@ -145,7 +166,6 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
         return menuList.value.filter(i => i.category === activeCategory.value);
       });
 
-      // 购物车逻辑
       const addToCart = (item) => {
         const existing = cart.value.find(c => c.id === item.id);
         if (existing) {
@@ -154,8 +174,8 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
           cart.value.push({
             id: item.id,
             name: item.name,
-            price: item.price,
-            printer: item.printer || 'Kitchen', // 标记打单目标
+            price: Number(item.price),
+            printer: item.printer || 'Kitchen',
             qty: 1
           });
         }
@@ -164,18 +184,16 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
       const totalCartCount = computed(() => cart.value.reduce((sum, item) => sum + item.qty, 0));
       const totalCartPrice = computed(() => cart.value.reduce((sum, item) => sum + (item.price * item.qty), 0));
 
-      // 3. 提交订单到 Supabase
       const submitOrder = async () => {
         if (cart.value.length === 0) return;
         submitting.value = true;
 
         try {
-          // 插入订单表
-          const { data, error } = await supabase.from('orders').insert([
+          const { error } = await supabaseClient.from('orders').insert([
             {
               table_no: currentTable.value,
               order_type: orderType.value,
-              items: cart.value, // 保存商品数组
+              items: cart.value,
               total_amount: totalCartPrice.value,
               status: 'Pending'
             }
@@ -183,13 +201,12 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
           if (error) throw error;
 
-          // 更新桌台状态为使用中
-          await supabase.from('tables').update({ status: 'Occupied' }).eq('table_no', currentTable.value);
+          await supabaseClient.from('tables').update({ status: 'Occupied' }).eq('table_no', currentTable.value);
 
-          alert(`✅ 下单成功！订单已发送至厨房，桌号: ${currentTable.value}`);
-          cart.value = []; // 清空购物车
+          alert(`✅ 下单成功！订单已发送至柜台与厨房，桌号: ${currentTable.value}`);
+          cart.value = [];
         } catch (err) {
-          alert('❌ 下单失败，请重试！');
+          alert('❌ 下单失败: ' + err.message);
           console.error(err);
         } finally {
           submitting.value = false;
@@ -205,6 +222,7 @@ const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
         menuList,
         loading,
         submitting,
+        errorMessage,
         activeCategory,
         categories,
         filteredMenu,
