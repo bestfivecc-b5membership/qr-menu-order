@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>柜台接单与打单系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+<div id="app" class="max-w-6xl mx-auto">
+
+  <!-- 顶部控制栏 -->
+  <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-bold flex items-center gap-2">
+        <span>🖥️</span> 柜台接单与打单控制台
+      </h1>
+      <p class="text-xs text-slate-400 mt-1">状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span></p>
+    </div>
+    <div class="flex gap-4">
+      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
+        🔊 开启接单提示音
+      </button>
+    </div>
+  </header>
+
+  <!-- 桌台与订单视图 -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- 待处理订单列表 (Pending) -->
+    <div class="md:col-span-2 space-y-4">
+      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
+        <span>🔔 待处理订单</span>
+        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
+      </h2>
+
+      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border border-gray-200">
+        暂无新订单，静候顾客扫码...
+      </div>
+
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md relative overflow-hidden">
+        <div class="flex justify-between items-start border-b pb-3 border-gray-100">
+          <div>
+            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded font-bold', order.order_type === 'Dine-In' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700']">
+              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
+            </span>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
+            <div class="text-lg font-bold text-gray-800">Total: RM {{ order.total_amount.toFixed(2) }}</div>
+          </div>
+        </div>
+
+        <!-- 订单项明细 -->
+        <div class="py-3 space-y-2">
+          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
+            <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
+              目标: {{ item.printer === 'Bar' ? '水吧 (Bar)' : '后厨 (Kitchen)' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex gap-2 pt-2 border-t border-gray-100">
+          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
+            🖨️ 分单打单 (Bar + Kitchen)
+          </button>
+          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
+            ✅ 已出菜
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 桌台状态与快速结账 (Tables) -->
+    <div>
+      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面开桌/结账状态</h2>
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
+          <div>
+            <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
+            <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
+              {{ table.status === 'Occupied' ? '🔴 使用中 (用餐中)' : '🟢 空闲' }}
+            </div>
+          </div>
+          <button 
+            v-if="table.status === 'Occupied'"
+            @click="clearTable(table.table_no)"
+            class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">
+            🧹 结账并清桌
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
+  const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
+
+  const { createApp, ref, onMounted } = Vue;
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  createApp({
+    setup() {
+      const pendingOrders = ref([]);
+      const tables = ref([]);
+      let audioContext = null;
+
+      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+
+      // 音效提醒
+      const enableAudio = () => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        alert('✅ 接单音效已激活！');
+      };
+
+      const playBeep = () => {
+        if (!audioContext) return;
+        const osc = audioContext.createOscillator();
+        osc.connect(audioContext.destination);
+        osc.frequency.value = 880; // A5 音调
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.3);
+      };
+
+      // 获取桌台与未处理订单
+      const fetchData = async () => {
+        const { data: oData } = await supabase.from('orders').select('*').eq('status', 'Pending').order('created_at', { ascending: false });
+        pendingOrders.value = oData || [];
+
+        const { data: tData } = await supabase.from('tables').select('*');
+        tables.value = tData || [];
+      };
+
+      // 实时监听 Supabase orders 表的新订单插入
+      const subscribeRealtime = () => {
+        supabase
+          .channel('schema-db-changes')
+          .on('postgres_changes', { event: 'INSERT', table: 'orders' }, payload => {
+            playBeep(); // 响铃
+            pendingOrders.value.unshift(payload.new); // 实时加入列表
+            fetchData(); // 刷新桌态
+          })
+          .subscribe();
+      };
+
+      // 核心拆单打印逻辑
+      const printSplitReceipts = (order) => {
+        const barItems = order.items.filter(i => i.printer === 'Bar');
+        const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
+
+        let msg = `【桌号: ${order.table_no} 拆单明细】\n\n`;
+
+        if (barItems.length > 0) {
+          msg += `🥤 [水吧单 -> 发送至 Bar 打印机]:\n` + barItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n') + `\n\n`;
+        }
+
+        if (kitchenItems.length > 0) {
+          msg += `🍳 [后厨单 -> 发送至 Kitchen 打印机]:\n` + kitchenItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n');
+        }
+
+        alert(msg);
+        // 未来连接本地打印代理工具（如 Web-Print-Agent）时，在此处调用静默打印 API 即可。
+      };
+
+      // 更新订单为已出菜
+      const markAsServed = async (orderId) => {
+        await supabase.from('orders').update({ status: 'Served' }).eq('id', orderId);
+        fetchData();
+      };
+
+      // 结账并清空桌号
+      const clearTable = async (tableNo) => {
+        if (confirm(`确定要为 ${tableNo} 桌结账并重置桌号吗？`)) {
+          await supabase.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+          fetchData();
+        }
+      };
+
+      onMounted(() => {
+        fetchData();
+        subscribeRealtime();
+      });
+
+      return {
+        pendingOrders,
+        tables,
+        formatTime,
+        enableAudio,
+        printSplitReceipts,
+        markAsServed,
+        clearTable
+      };
+    }
+  }).mount('#app');
+</script>
+
+</body>
+</html>
