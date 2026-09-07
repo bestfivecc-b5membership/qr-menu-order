@@ -1,89 +1,81 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <title>POS Admin Counter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>柜台接单控制台</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>[v-cloak] { display: none !important; }</style>
 </head>
-<body class="bg-slate-100 p-6 min-h-screen">
+<body class="bg-gray-100 p-6">
 
-<div id="app" v-cloak class="max-w-7xl mx-auto space-y-6">
-  <header class="bg-slate-900 text-white p-5 rounded-2xl shadow-lg flex justify-between items-center">
+<div id="app" v-cloak class="max-w-6xl mx-auto">
+  <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
     <div>
-      <h1 class="text-2xl font-black">🖥️ 柜台 POS 系统 (全新纯净版)</h1>
-      <p class="text-xs text-slate-400 mt-1">按桌号自动合并汇总 · 独立结账打发票</p>
+      <h1 class="text-2xl font-bold flex items-center gap-2"><span>🖥️</span> 柜台接单控制台</h1>
+      <p class="text-xs text-slate-400 mt-1">
+        状态: <span class="text-green-400 font-bold">● 实时监听中</span> | 
+        打单服务: <span class="text-green-400 font-bold">● 网络 IP 静默自动吐单</span>
+      </p>
     </div>
-    <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1.5 rounded-full font-bold">● 实时就绪</span>
+    <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
+      🔊 开启接单提示音
+    </button>
   </header>
 
-  <!-- 桌号列表 -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div v-for="(orders, tableNo) in groupedTables" :key="tableNo" class="bg-white rounded-2xl shadow-md border p-5 flex flex-col justify-between space-y-4">
-      
-      <div>
-        <div class="flex justify-between items-center border-b pb-3">
-          <span class="bg-amber-500 text-white font-black text-2xl px-3 py-1 rounded-xl">
-            TABLE: {{ tableNo }}
-          </span>
-          <span class="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">
-            下单 {{ orders.length }} 次
-          </span>
-        </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="md:col-span-2 space-y-4">
+      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
+        <span>🔔 待处理订单</span>
+        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
+      </h2>
 
-        <!-- 菜品自动汇总 -->
-        <div class="mt-4 space-y-2 max-h-60 overflow-y-auto">
-          <div v-for="item in getMergedItems(orders)" :key="item.name" class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border text-sm">
-            <span class="font-bold text-slate-800">{{ item.name }}</span>
-            <span class="font-black text-amber-600">x{{ item.qty }}</span>
+      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border">
+        暂无新订单，静候顾客扫码...
+      </div>
+
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md">
+        <div class="flex justify-between items-start border-b pb-3">
+          <div>
+            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
+            <span class="text-xs px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-700">
+              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
+            </span>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
+            <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
           </div>
         </div>
-      </div>
 
-      <div class="border-t pt-3 space-y-3">
-        <div class="flex justify-between items-center font-black">
-          <span class="text-slate-500">全单总计:</span>
-          <span class="text-2xl text-emerald-600">RM {{ getTableTotal(orders).toFixed(2) }}</span>
+        <div class="py-3 space-y-2">
+          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
+            <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
+              目标: {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
+            </span>
+          </div>
         </div>
 
-        <button @click="openCheckout(tableNo, orders)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow transition">
-          💳 结账并出发票 (Checkout)
-        </button>
-      </div>
-
-    </div>
-
-    <div v-if="Object.keys(groupedTables).length === 0" class="col-span-full text-center py-20 bg-white rounded-2xl border text-slate-400 font-bold">
-      🍵 当前无未结账桌号
-    </div>
-  </div>
-
-  <!-- 结账弹窗 -->
-  <div v-if="activeTable" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5">
-      <h3 class="text-xl font-black border-b pb-2">桌号 {{ activeTable }} 结账</h3>
-      
-      <div class="text-center bg-emerald-50 py-3 rounded-2xl border border-emerald-100">
-        <div class="text-xs text-emerald-600 font-bold">应收总额</div>
-        <div class="text-3xl font-black text-emerald-700">RM {{ activeTotal.toFixed(2) }}</div>
-      </div>
-
-      <div class="space-y-2">
-        <label class="block text-xs font-bold text-slate-600">选择支付方式：</label>
-        <div class="grid grid-cols-2 gap-2">
-          <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'MasterCard']" :key="m"
-                  @click="selectedPayment = m"
-                  :class="['py-2.5 text-xs font-bold rounded-xl border transition', selectedPayment === m ? 'bg-amber-500 text-white border-amber-500 shadow' : 'bg-slate-50 text-slate-700']">
-            {{ m }}
+        <div class="pt-2 border-t">
+          <button @click="markAsServed(order.id)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-bold shadow">
+            ✅ 已完成出菜
           </button>
         </div>
       </div>
+    </div>
 
-      <div class="flex gap-2 pt-2">
-        <button @click="activeTable = null" class="w-1/2 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">取消</button>
-        <button @click="confirmCheckout" class="w-1/2 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">确认支付并清除</button>
+    <div>
+      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面状态</h2>
+      <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border">
+          <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
+          <button v-if="table.status === 'Occupied'" @click="clearTable(table.table_no)" class="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
+            🧹 清桌
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -92,90 +84,38 @@
 <script>
   const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-  const { createApp, ref, computed, onMounted } = Vue;
+  const { createApp, ref, onMounted } = Vue;
 
   createApp({
     setup() {
-      const rawOrders = ref([]);
-      const activeTable = ref(null);
-      const activeOrders = ref([]);
-      const selectedPayment = ref('Cash');
+      const pendingOrders = ref([]);
+      const tables = ref([]);
       let supabaseClient = null;
 
-      const fetchOrders = async () => {
+      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+
+      const fetchData = async () => {
         if (!supabaseClient) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        // 只查未结账且非发票的订单
-        const { data } = await supabaseClient.from('orders')
-          .select('*')
-          .eq('status', 'Pending')
-          .is('is_invoice', null);
-        rawOrders.value = data || [];
+        const { data: oData } = await supabaseClient.from('orders').select('*').eq('status', 'Pending');
+        pendingOrders.value = oData || [];
+        const { data: tData } = await supabaseClient.from('tables').select('*');
+        tables.value = tData || [];
       };
 
-      const groupedTables = computed(() => {
-        const map = {};
-        rawOrders.value.forEach(o => {
-          if (!map[o.table_no]) map[o.table_no] = [];
-          map[o.table_no].push(o);
-        });
-        return map;
-      });
-
-      const getMergedItems = (orders) => {
-        const map = {};
-        orders.forEach(o => {
-          (o.items || []).forEach(i => {
-            if (!map[i.name]) map[i.name] = { ...i, qty: 0 };
-            map[i.name].qty += Number(i.qty);
-          });
-        });
-        return Object.values(map);
-      };
-
-      const getTableTotal = (orders) => {
-        return orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      };
-
-      const activeTotal = computed(() => getTableTotal(activeOrders.value));
-
-      const openCheckout = (tableNo, orders) => {
-        activeTable.value = tableNo;
-        activeOrders.value = orders;
-        selectedPayment.value = 'Cash';
-      };
-
-      const confirmCheckout = async () => {
-        if (!activeTable.value) return;
-
-        const mergedItems = getMergedItems(activeOrders.value);
-        const orderIds = activeOrders.value.map(o => o.id);
-
-        // 1. 将原订单全部更新为 Paid
-        await supabaseClient.from('orders').update({ status: 'Paid' }).in('id', orderIds);
-
-        // 2. 插入一条专门触发发票打印的记录
-        await supabaseClient.from('orders').insert({
-          table_no: activeTable.value,
-          items: mergedItems,
-          total_amount: activeTotal.value,
-          payment_method: selectedPayment.value,
-          status: 'Paid',
-          is_invoice: true
-        });
-
-        activeTable.value = null;
-        fetchOrders();
+      const markAsServed = async (orderId) => {
+        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
+        fetchData();
       };
 
       onMounted(() => {
-        fetchOrders();
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        supabaseClient.channel('admin-updates').on('postgres_changes', { event: '*', table: 'orders' }, () => {
-          fetchOrders();
-        }).subscribe();
+        fetchData();
+        window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+          .channel('db-changes')
+          .on('postgres_changes', { event: '*', table: 'orders' }, () => fetchData())
+          .subscribe();
       });
 
-      return { groupedTables, getMergedItems, getTableTotal, activeTable, activeTotal, selectedPayment, openCheckout, confirmCheckout };
+      return { pendingOrders, tables, formatTime, markAsServed };
     }
   }).mount('#app');
 </script>
