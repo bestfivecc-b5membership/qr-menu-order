@@ -1,298 +1,125 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>柜台接单与打单系统</title>
+  <title>POS Counter Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <!-- QZ Tray 静默打印 SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js"></script>
-  <style>
-    [v-cloak] { display: none !important; }
-  </style>
+  <style>[v-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-gray-100 p-6">
 
 <div id="app" v-cloak class="max-w-6xl mx-auto">
-
-  <!-- 顶部控制栏 -->
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <span>🖥️</span> 柜台接单与打单控制台
-      </h1>
-      <p class="text-xs text-slate-400 mt-1">
-        状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span> | 
-        打印机组件: <span :class="qzConnected ? 'text-green-400 font-bold' : 'text-red-400 font-bold'">{{ qzConnected ? '● 已连接 QZ Tray' : '○ 未连接 QZ' }}</span>
-      </p>
-    </div>
-    <div class="flex gap-3">
-      <button @click="connectQz" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs shadow">
-        🔌 连接打印机服务
-      </button>
-      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
-        🔊 开启接单提示音
-      </button>
-    </div>
+    <h1 class="text-2xl font-bold">🖥️ Counter POS System</h1>
+    <span class="text-green-400 font-bold">● System Online</span>
   </header>
 
-  <!-- 错误与状态提示 -->
-  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">
-    ❌ {{ errorMessage }}
-  </div>
-
-  <!-- 待处理订单列表 (Pending) -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
+    <!-- 订单列表 -->
     <div class="md:col-span-2 space-y-4">
-      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
-        <span>🔔 待处理订单</span>
-        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
-      </h2>
+      <h2 class="text-lg font-bold text-gray-700">🔔 Active Orders</h2>
 
-      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border border-gray-200">
-        暂无新订单，静候顾客扫码...
-      </div>
-
-      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md relative overflow-hidden">
-        <div class="flex justify-between items-start border-b pb-3 border-gray-100">
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border shadow-md space-y-3">
+        <div class="flex justify-between items-start border-b pb-2">
           <div>
-            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
-            <span :class="['text-xs px-2 py-0.5 rounded font-bold', order.order_type === 'Dine-In' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700']">
-              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
-            </span>
+            <span class="text-2xl font-black text-amber-600">TABLE: {{ order.table_no }}</span>
+            <span class="ml-3 text-sm text-gray-500">Chk #: {{ order.check_no || '67280' }}</span>
           </div>
           <div class="text-right">
-            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
             <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
           </div>
         </div>
 
-        <!-- 订单项明细 -->
-        <div class="py-3 space-y-2">
+        <div class="space-y-1">
           <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
             <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
-            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              目标: {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
-            </span>
+            <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">{{ item.printer }}</span>
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="flex gap-2 pt-2 border-t border-gray-100">
-          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow flex justify-center items-center gap-1">
-            <span>🖨️</span> 自动静默打单 (BAR + KITCHEN)
-          </button>
-          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
-            ✅ 已出菜
+        <!-- 结账按钮 -->
+        <div class="pt-2 border-t flex gap-2">
+          <button @click="openCheckoutModal(order)" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold shadow">
+            💳 Checkout & Print Receipt
           </button>
         </div>
       </div>
     </div>
-
-    <!-- 桌台状态 -->
-    <div>
-      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面开桌/结账状态</h2>
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
-          <div>
-            <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
-            <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
-              {{ table.status === 'Occupied' ? '🔴 使用中 (用餐中)' : '🟢 空闲' }}
-            </div>
-          </div>
-          <button 
-            v-if="table.status === 'Occupied'"
-            @click="clearTable(table.table_no)"
-            class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">
-            🧹 结账并清桌
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 
+  <!-- 结账与支付选择弹窗 -->
+  <div v-if="selectedOrder" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold border-b pb-2">Checkout - Table {{ selectedOrder.table_no }}</h3>
+      <div class="text-2xl font-black text-center text-emerald-600 my-2">
+        Total: RM {{ Number(selectedOrder.total_amount).toFixed(2) }}
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-bold text-gray-700">Select Payment Method:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'MasterCard', 'Debit Card']" :key="m"
+                  @click="paymentMethod = m"
+                  :class="['p-3 border rounded-xl font-bold text-sm', paymentMethod === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-700']">
+            {{ m }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-4">
+        <button @click="selectedOrder = null" class="w-1/2 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold">Cancel</button>
+        <button @click="confirmPayment" :disabled="!paymentMethod" class="w-1/2 bg-emerald-600 text-white py-3 rounded-xl font-bold disabled:opacity-50">Confirm & Print</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
   const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-
-  // Windows 对应的打印机名字
-  const BAR_PRINTER_NAME = "BAR";
-  const KITCHEN_PRINTER_NAME = "KITCHEN";
-
   const { createApp, ref, onMounted } = Vue;
 
   createApp({
     setup() {
       const pendingOrders = ref([]);
-      const tables = ref([]);
-      const errorMessage = ref('');
-      const qzConnected = ref(false);
-      let audioContext = null;
+      const selectedOrder = ref(null);
+      const paymentMethod = ref('');
       let supabaseClient = null;
 
-      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
-
-      const enableAudio = () => {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        alert('✅ 接单音效已激活！');
-      };
-
-      const playBeep = () => {
-        if (!audioContext) return;
-        const osc = audioContext.createOscillator();
-        osc.connect(audioContext.destination);
-        osc.frequency.value = 880;
-        osc.start();
-        osc.stop(audioContext.currentTime + 0.3);
-      };
-
-      // 连接 QZ Tray 打印服务
-      const connectQz = async () => {
-        try {
-          if (!window.qz) throw new Error("QZ Tray SDK 未加载");
-          if (!qz.websocket.isActive()) {
-            await qz.websocket.connect();
-          }
-          qzConnected.value = true;
-          console.log("✅ QZ Tray 连接成功");
-        } catch (err) {
-          qzConnected.value = false;
-          console.warn("⚠️ 无法连接 QZ Tray，请确认后台 QZ Tray 软件已开启", err);
-        }
-      };
-
-      const initSupabase = () => {
-        const supabaseLib = window.supabase || window.supabaseJs;
-        if (!supabaseLib) throw new Error("Supabase SDK 加载失败");
-        return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
-      };
-
       const fetchData = async () => {
-        try {
-          if (!supabaseClient) supabaseClient = initSupabase();
-
-          const { data: oData, error: oErr } = await supabaseClient
-            .from('orders')
-            .select('*')
-            .eq('status', 'Pending')
-            .order('created_at', { ascending: false });
-
-          if (oErr) throw oErr;
-          pendingOrders.value = oData || [];
-
-          const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
-          if (tErr) throw tErr;
-          tables.value = tData || [];
-        } catch (err) {
-          errorMessage.value = '数据读取失败: ' + err.message;
-        }
+        if (!supabaseClient) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { data } = await supabaseClient.from('orders').select('*').eq('status', 'Pending');
+        pendingOrders.value = data || [];
       };
 
-      const subscribeRealtime = () => {
-        if (!supabaseClient) return;
-        supabaseClient
-          .channel('schema-db-changes')
-          .on('postgres_changes', { event: 'INSERT', table: 'orders' }, payload => {
-            playBeep();
-            fetchData();
-          })
-          .subscribe();
+      const openCheckoutModal = (order) => {
+        selectedOrder.value = order;
+        paymentMethod.value = '';
       };
 
-      // 构建热敏打印文本格式
-      const buildReceiptText = (title, tableNo, items) => {
-        let text = `==============================\n`;
-        text += `        ${title}\n`;
-        text += `==============================\n`;
-        text += `桌号: ${tableNo}\n`;
-        text += `时间: ${new Date().toLocaleTimeString()}\n`;
-        text += `------------------------------\n`;
-        items.forEach(item => {
-          text += `${item.name.padEnd(18)} x${item.qty}\n`;
-        });
-        text += `------------------------------\n\n\n\n\n`; // 留空白切纸
-        return text;
-      };
+      const confirmPayment = async () => {
+        if (!selectedOrder.value || !paymentMethod.value) return;
+        
+        // 更新订单状态为已结账并记录支付方式
+        await supabaseClient.from('orders').update({
+          status: 'Paid',
+          payment_method: paymentMethod.value
+        }).eq('id', selectedOrder.value.id);
 
-      // 执行静默分单打单
-      const printSplitReceipts = async (order) => {
-        const barItems = order.items.filter(i => i.printer === 'Bar');
-        const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
-
-        if (!qzConnected.value) {
-          await connectQz();
-        }
-
-        // 如果连不上 QZ Tray，弹窗回退提醒
-        if (!qzConnected.value) {
-          let fallbackMsg = `【未检测到 QZ Tray 后台，显示模拟小票】\n\n`;
-          if (barItems.length > 0) fallbackMsg += `🥤 [BAR 打印机]:\n` + barItems.map(i => `${i.name} x${i.qty}`).join('\n') + `\n\n`;
-          if (kitchenItems.length > 0) fallbackMsg += `🍳 [KITCHEN 打印机]:\n` + kitchenItems.map(i => `${i.name} x${i.qty}`).join('\n');
-          alert(fallbackMsg);
-          return;
-        }
-
-        try {
-          // 发送 Bar 单
-          if (barItems.length > 0) {
-            const configBar = qz.configs.create(BAR_PRINTER_NAME);
-            const dataBar = [buildReceiptText("--- 水吧单 (BAR) ---", order.table_no, barItems)];
-            await qz.print(configBar, dataBar);
-          }
-
-          // 发送 Kitchen 单
-          if (kitchenItems.length > 0) {
-            const configKitchen = qz.configs.create(KITCHEN_PRINTER_NAME);
-            const dataKitchen = [buildReceiptText("--- 厨房单 (KITCHEN) ---", order.table_no, kitchenItems)];
-            await qz.print(configKitchen, dataKitchen);
-          }
-
-          alert("✅ 已成功向 BAR 和 KITCHEN 打印机发送出纸指令！");
-        } catch (err) {
-          alert("❌ 打单失败: " + err.message);
-          console.error(err);
-        }
-      };
-
-      const markAsServed = async (orderId) => {
-        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
+        alert(`Payment Confirmed via ${paymentMethod.value}. Receipt sent to printer.`);
+        selectedOrder.value = null;
         fetchData();
-      };
-
-      const clearTable = async (tableNo) => {
-        if (confirm(`确定要为 ${tableNo} 桌结账并重置桌号吗？`)) {
-          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
-          fetchData();
-        }
       };
 
       onMounted(() => {
         fetchData();
-        subscribeRealtime();
-        connectQz();
       });
 
-      return {
-        pendingOrders,
-        tables,
-        errorMessage,
-        qzConnected,
-        formatTime,
-        enableAudio,
-        connectQz,
-        printSplitReceipts,
-        markAsServed,
-        clearTable
-      };
+      return { pendingOrders, selectedOrder, paymentMethod, openCheckoutModal, confirmPayment };
     }
   }).mount('#app');
 </script>
-
 </body>
 </html>
