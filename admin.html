@@ -1,205 +1,107 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>POS 现代柜台控制台</title>
-  <!-- Tailwind CSS & Vue 3 -->
+  <title>柜台接单与打单系统</title>
+  <!-- 替换为稳定高可用的 CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    [v-cloak] { display: none !important; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+<body class="bg-gray-100 p-6">
 
-  <div id="app" class="flex flex-col h-screen overflow-hidden">
+<div id="app" v-cloak class="max-w-6xl mx-auto">
 
-    <!-- 顶栏 Navigation Header -->
-    <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg">
-      <div class="flex items-center gap-4">
-        <div class="bg-emerald-500/20 text-emerald-400 p-2.5 rounded-xl border border-emerald-500/30">
-          <i class="fa-solid fa-utensils text-xl"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-black tracking-wide text-white">智慧餐厅控制中心</h1>
-          <p class="text-xs text-slate-400">QR 码实时进单 & 柜台收银管理</p>
-        </div>
+  <!-- 顶部控制栏 -->
+  <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-bold flex items-center gap-2">
+        <span>🖥️</span> 柜台接单与打单控制台
+      </h1>
+      <p class="text-xs text-slate-400 mt-1">状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span></p>
+    </div>
+    <div class="flex gap-4">
+      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
+        🔊 开启接单提示音
+      </button>
+    </div>
+  </header>
+
+  <!-- 错误提示 -->
+  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">
+    ❌ {{ errorMessage }}
+  </div>
+
+  <!-- 桌台与订单视图 -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- 待处理订单列表 (Pending) -->
+    <div class="md:col-span-2 space-y-4">
+      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
+        <span>🔔 待处理订单</span>
+        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
+      </h2>
+
+      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border border-gray-200">
+        暂无新订单，静候顾客扫码...
       </div>
 
-      <!-- 视图切换 & 状态 -->
-      <div class="flex items-center gap-4">
-        <div class="bg-slate-900 p-1 rounded-lg border border-slate-700 flex text-xs font-semibold">
-          <button @click="currentView = 'tables'" 
-                  :class="currentView === 'tables' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'"
-                  class="px-4 py-2 rounded-md transition-all">
-            <i class="fa-solid fa-border-all mr-1.5"></i> 桌位看板 ({{ Object.keys(groupedTables).length }})
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md relative overflow-hidden">
+        <div class="flex justify-between items-start border-b pb-3 border-gray-100">
+          <div>
+            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded font-bold', order.order_type === 'Dine-In' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700']">
+              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
+            </span>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
+            <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
+          </div>
+        </div>
+
+        <!-- 订单项明细 -->
+        <div class="py-3 space-y-2">
+          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
+            <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
+            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
+              目标: {{ item.printer === 'Bar' ? '水吧 (Bar)' : '后厨 (Kitchen)' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex gap-2 pt-2 border-t border-gray-100">
+          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
+            🖨️ 分单打单 (Bar + Kitchen)
           </button>
-          <button @click="currentView = 'timeline'" 
-                  :class="currentView === 'timeline' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'"
-                  class="px-4 py-2 rounded-md transition-all">
-            <i class="fa-solid fa-clock-rotate-left mr-1.5"></i> 进单流水 ({{ rawOrders.length }})
-          </button>
-        </div>
-
-        <div class="flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/50 px-3 py-1.5 rounded-full">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-xs font-medium text-emerald-300">实时连接中</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- 主体区域 Main Content -->
-    <main class="flex-1 overflow-y-auto p-6 bg-slate-900/50">
-
-      <!-- 视图 1：桌位看板视角 -->
-      <div v-if="currentView === 'tables'">
-        <div v-if="Object.keys(groupedTables).length === 0" class="flex flex-col items-center justify-center h-96 text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-          <i class="fa-solid fa-receipt text-5xl mb-3 opacity-40"></i>
-          <p class="text-base font-medium">当前暂无未结账桌号，等待顾客扫码下单...</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          <div v-for="(tableData, tableNo) in groupedTables" :key="tableNo" 
-               class="bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 rounded-2xl shadow-xl flex flex-col justify-between overflow-hidden transition-all">
-            
-            <!-- 卡片头部 -->
-            <div>
-              <div class="bg-gradient-to-r from-slate-800 to-slate-700/50 px-5 py-3.5 border-b border-slate-700/60 flex justify-between items-center">
-                <div class="flex items-center gap-2.5">
-                  <span class="bg-emerald-500 text-slate-950 font-black text-sm px-2.5 py-0.5 rounded-md">桌 {{ tableNo }}</span>
-                  <span class="text-xs text-slate-400">{{ tableData.orders.length }} 次加单</span>
-                </div>
-                <button @click="openHistoryDrawer(tableNo, tableData)" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium">
-                  加单历史 <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                </button>
-              </div>
-
-              <!-- 未结账汇总菜品 -->
-              <div class="p-4 space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                <div v-for="(item, idx) in tableData.aggregatedItems" :key="idx" 
-                     class="flex justify-between items-center text-sm py-1 border-b border-slate-700/30 last:border-0">
-                  <div class="flex items-center gap-2">
-                    <span :class="item.type === 'food' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'"
-                          class="text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold">
-                      {{ item.type === 'food' ? '餐' : '饮' }}
-                    </span>
-                    <span class="font-medium text-slate-200">{{ item.name }}</span>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="text-xs font-bold text-slate-400">x{{ item.qty }}</span>
-                    <span class="font-semibold text-slate-300 text-xs w-16 text-right">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 卡片底部结账栏 -->
-            <div class="p-4 bg-slate-900/60 border-t border-slate-700/60">
-              <div class="flex justify-between items-end mb-3">
-                <span class="text-xs text-slate-400 font-medium">合计待结算</span>
-                <span class="text-2xl font-black text-emerald-400">RM {{ tableData.totalAmount.toFixed(2) }}</span>
-              </div>
-              <button @click="openCheckoutModal(tableNo, tableData)" 
-                      class="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 font-black py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2">
-                <i class="fa-solid fa-cash-register"></i> 结账并打印发票
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 视图 2：进单流水视角（实时观察每一笔 QR 下单） -->
-      <div v-if="currentView === 'timeline'" class="max-w-4xl mx-auto space-y-4">
-        <div v-for="order in rawOrders" :key="order.id" class="bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-md flex justify-between items-start">
-          <div class="space-y-2 flex-1">
-            <div class="flex items-center gap-3">
-              <span class="bg-slate-700 text-white font-bold text-sm px-3 py-1 rounded-lg">桌号: {{ order.table_no }}</span>
-              <span class="text-xs text-slate-400">订单号: #{{ order.id }}</span>
-              <span class="text-xs text-slate-500"><i class="fa-regular fa-clock mr-1"></i>{{ formatTime(order.created_at) }}</span>
-            </div>
-            <div class="flex flex-wrap gap-2 pt-1">
-              <span v-for="item in order.items" :key="item.name" class="bg-slate-900 border border-slate-700 text-xs text-slate-300 px-2.5 py-1 rounded-md">
-                {{ item.name }} <strong class="text-emerald-400 ml-1">x{{ item.qty }}</strong>
-              </span>
-            </div>
-          </div>
-          <div class="text-right pl-4 border-l border-slate-700">
-            <div class="text-xs text-slate-400 mb-1">单笔金额</div>
-            <div class="text-lg font-black text-emerald-400">RM {{ Number(order.total_amount || 0).toFixed(2) }}</div>
-          </div>
-        </div>
-      </div>
-
-    </main>
-
-    <!-- 侧栏：加单历史 Drawer -->
-    <div v-if="showDrawer" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex justify-end" @click.self="showDrawer = false">
-      <div class="w-full max-w-md bg-slate-800 h-full shadow-2xl p-6 flex flex-col justify-between border-l border-slate-700 animate-slide-left">
-        <div>
-          <div class="flex justify-between items-center pb-4 mb-4 border-b border-slate-700">
-            <h3 class="text-lg font-bold text-white">桌号 {{ drawerTableNo }} - 加单明细历史</h3>
-            <button @click="showDrawer = false" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-          </div>
-          <div class="space-y-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-1">
-            <div v-for="(ord, index) in drawerData.orders" :key="ord.id" class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50">
-              <div class="flex justify-between text-xs text-slate-400 mb-2">
-                <span class="font-bold text-slate-300">第 {{ index + 1 }} 次下单 (#{{ ord.id }})</span>
-                <span>{{ formatTime(ord.created_at) }}</span>
-              </div>
-              <div class="space-y-1">
-                <div v-for="it in ord.items" :key="it.name" class="flex justify-between text-xs">
-                  <span class="text-slate-300">{{ it.name }} x{{ it.qty }}</span>
-                  <span class="text-slate-400">RM {{ (it.price * it.qty).toFixed(2) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="pt-4 border-t border-slate-700">
-          <div class="flex justify-between mb-3 text-sm">
-            <span class="text-slate-400">累计总额</span>
-            <span class="text-xl font-black text-emerald-400">RM {{ drawerData.totalAmount.toFixed(2) }}</span>
-          </div>
-          <button @click="showDrawer = false; openCheckoutModal(drawerTableNo, drawerData)" class="w-full bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl">
-            直接发起结账
+          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
+            ✅ 已出菜
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 结账确认 Modal -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-5">
-        <div class="text-center">
-          <div class="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3">
-            <i class="fa-solid fa-cash-register text-xl"></i>
+    <!-- 桌台状态与快速结账 (Tables) -->
+    <div>
+      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面开桌/结账状态</h2>
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
+          <div>
+            <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
+            <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
+              {{ table.status === 'Occupied' ? '🔴 使用中 (用餐中)' : '🟢 空闲' }}
+            </div>
           </div>
-          <h3 class="text-xl font-bold text-white">桌号 {{ currentModalTable }} 确认结账</h3>
-          <p class="text-xs text-slate-400 mt-1">结账后卡片将清空，并自动打单</p>
-        </div>
-
-        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 flex justify-between items-center">
-          <span class="text-xs text-slate-400">应收金额</span>
-          <span class="text-2xl font-black text-emerald-400">RM {{ currentModalData.totalAmount.toFixed(2) }}</span>
-        </div>
-
-        <!-- 支付方式 -->
-        <div>
-          <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">选择支付方式</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button v-for="method in ['Cash', 'Touch n Go', 'QR Pay', 'Visa / Card']" :key="method"
-                    @click="selectedPaymentMethod = method"
-                    :class="selectedPaymentMethod === method ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600'"
-                    class="py-2.5 border rounded-xl text-xs font-semibold transition-all">
-              {{ method }}
-            </button>
-          </div>
-        </div>
-
-        <div class="flex gap-3 pt-2">
-          <button @click="showModal = false" class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold text-slate-300">取消</button>
-          <button @click="confirmCheckout" :disabled="isSubmitting" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black transition-all">
-            {{ isSubmitting ? '处理中...' : '确认完成结账' }}
+          <button 
+            v-if="table.status === 'Occupied'"
+            @click="clearTable(table.table_no)"
+            class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">
+            🧹 结账并清桌
           </button>
         </div>
       </div>
@@ -207,160 +109,126 @@
 
   </div>
 
-  <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+</div>
 
-    // 1. 请在此处配置您的 Supabase 连接
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<script>
+  const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
+  const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
-    createApp({
-      setup() {
-        const currentView = ref('tables');
-        const rawOrders = ref([]);
-        
-        // 模态框 & 侧栏控制
-        const showModal = ref(false);
-        const showDrawer = ref(false);
-        const currentModalTable = ref('');
-        const currentModalData = ref({ totalAmount: 0, orders: [] });
-        const drawerTableNo = ref('');
-        const drawerData = ref({ totalAmount: 0, orders: [] });
-        const selectedPaymentMethod = ref('Cash');
-        const isSubmitting = ref(false);
+  const { createApp, ref, onMounted } = Vue;
 
-        // 获取数据库所有 unpaid 的记录
-        const fetchOrders = async () => {
-          const { data, error } = await supabaseClient
+  createApp({
+    setup() {
+      const pendingOrders = ref([]);
+      const tables = ref([]);
+      const errorMessage = ref('');
+      let audioContext = null;
+      let supabaseClient = null;
+
+      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+
+      const enableAudio = () => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        alert('✅ 接单音效已激活！');
+      };
+
+      const playBeep = () => {
+        if (!audioContext) return;
+        const osc = audioContext.createOscillator();
+        osc.connect(audioContext.destination);
+        osc.frequency.value = 880;
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.3);
+      };
+
+      const initSupabase = () => {
+        const supabaseLib = window.supabase || window.supabaseJs;
+        if (!supabaseLib) {
+          throw new Error("Supabase SDK 加载失败，请刷新页面重试！");
+        }
+        return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+      };
+
+      const fetchData = async () => {
+        try {
+          if (!supabaseClient) supabaseClient = initSupabase();
+
+          const { data: oData, error: oErr } = await supabaseClient
             .from('orders')
             .select('*')
-            .eq('status', 'unpaid')
+            .eq('status', 'Pending')
             .order('created_at', { ascending: false });
 
-          if (!error && data) {
-            rawOrders.value = data;
-          }
-        };
+          if (oErr) throw oErr;
+          pendingOrders.value = oData || [];
 
-        // 按桌号合并卡片逻辑
-        const groupedTables = computed(() => {
-          const groups = {};
-          // 按时间正序处理，保障菜品逻辑
-          const sorted = [...rawOrders.value].reverse();
+          const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
+          if (tErr) throw tErr;
+          tables.value = tData || [];
+        } catch (err) {
+          errorMessage.value = '数据读取失败: ' + err.message;
+          console.error(err);
+        }
+      };
 
-          sorted.forEach(order => {
-            const table = order.table_no;
-            if (!groups[table]) {
-              groups[table] = { orders: [], aggregatedItems: [], totalAmount: 0 };
-            }
+      const subscribeRealtime = () => {
+        if (!supabaseClient) return;
+        supabaseClient
+          .channel('schema-db-changes')
+          .on('postgres_changes', { event: 'INSERT', table: 'orders' }, payload => {
+            playBeep();
+            fetchData();
+          })
+          .subscribe();
+      };
 
-            groups[table].orders.push(order);
-            groups[table].totalAmount += Number(order.total_amount || 0);
+      const printSplitReceipts = (order) => {
+        const barItems = order.items.filter(i => i.printer === 'Bar');
+        const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
 
-            (order.items || []).forEach(item => {
-              const existing = groups[table].aggregatedItems.find(i => i.name === item.name);
-              if (existing) {
-                existing.qty += item.qty;
-              } else {
-                groups[table].aggregatedItems.push({ ...item });
-              }
-            });
-          });
+        let msg = `【桌号: ${order.table_no} 拆单明细】\n\n`;
 
-          return groups;
-        });
+        if (barItems.length > 0) {
+          msg += `🥤 [水吧单 -> 发送至 Bar 打印机]:\n` + barItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n') + `\n\n`;
+        }
 
-        // 时间格式化小工具
-        const formatTime = (ts) => {
-          if (!ts) return '';
-          const d = new Date(ts);
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        };
+        if (kitchenItems.length > 0) {
+          msg += `🍳 [后厨单 -> 发送至 Kitchen 打印机]:\n` + kitchenItems.map(i => `  - ${i.name} x ${i.qty}`).join('\n');
+        }
 
-        // 订阅 Supabase 实时推送
-        const subscribeRealtime = () => {
-          supabaseClient
-            .channel('admin_realtime_channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-              fetchOrders();
-            })
-            .subscribe();
-        };
+        alert(msg);
+      };
 
-        const openCheckoutModal = (tableNo, tableData) => {
-          currentModalTable.value = tableNo;
-          currentModalData.value = tableData;
-          selectedPaymentMethod.value = 'Cash';
-          showModal.value = true;
-        };
+      const markAsServed = async (orderId) => {
+        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
+        fetchData();
+      };
 
-        const openHistoryDrawer = (tableNo, tableData) => {
-          drawerTableNo.value = tableNo;
-          drawerData.value = tableData;
-          showDrawer.value = true;
-        };
+      const clearTable = async (tableNo) => {
+        if (confirm(`确定要为 ${tableNo} 桌结账并重置桌号吗？`)) {
+          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+          fetchData();
+        }
+      };
 
-        // 执行结账
-        const confirmCheckout = async () => {
-          isSubmitting.value = true;
-          const orderIds = currentModalData.value.orders.map(o => o.id);
+      onMounted(() => {
+        fetchData();
+        subscribeRealtime();
+      });
 
-          const { error } = await supabaseClient
-            .from('orders')
-            .update({ 
-              status: 'paid',
-              payment_method: selectedPaymentMethod.value,
-              trigger_invoice_print: true
-            })
-            .in('id', orderIds);
-
-          isSubmitting.value = false;
-
-          if (!error) {
-            showModal.value = false;
-            fetchOrders();
-          } else {
-            alert('结账失败: ' + error.message);
-          }
-        };
-
-        onMounted(() => {
-          fetchOrders();
-          subscribeRealtime();
-        });
-
-        return {
-          currentView,
-          rawOrders,
-          groupedTables,
-          showModal,
-          showDrawer,
-          currentModalTable,
-          currentModalData,
-          drawerTableNo,
-          drawerData,
-          selectedPaymentMethod,
-          isSubmitting,
-          formatTime,
-          openCheckoutModal,
-          openHistoryDrawer,
-          confirmCheckout
-        };
-      }
-    }).mount('#app');
-  </script>
-
-  <style>
-    /* 自定义滚动条及动画 */
-    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 1); border-radius: 4px; }
-    @keyframes slideLeft {
-      from { transform: translateX(100%); }
-      to { transform: translateX(0); }
+      return {
+        pendingOrders,
+        tables,
+        errorMessage,
+        formatTime,
+        enableAudio,
+        printSplitReceipts,
+        markAsServed,
+        clearTable
+      };
     }
-    .animate-slide-left { animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-  </style>
+  }).mount('#app');
+</script>
+
 </body>
 </html>
