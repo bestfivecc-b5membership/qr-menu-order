@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>柜台接单控制台</title>
+  <title>POS Counter Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -13,69 +12,65 @@
 
 <div id="app" v-cloak class="max-w-6xl mx-auto">
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2"><span>🖥️</span> 柜台接单控制台</h1>
-      <p class="text-xs text-slate-400 mt-1">
-        状态: <span class="text-green-400 font-bold">● 实时监听中</span> | 
-        打单服务: <span class="text-green-400 font-bold">● 网络 IP 静默自动吐单</span>
-      </p>
-    </div>
-    <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
-      🔊 开启接单提示音
-    </button>
+    <h1 class="text-2xl font-bold">🖥️ Counter POS System</h1>
+    <span class="text-green-400 font-bold">● System Online</span>
   </header>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- 订单列表 -->
     <div class="md:col-span-2 space-y-4">
-      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
-        <span>🔔 待处理订单</span>
-        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
-      </h2>
+      <h2 class="text-lg font-bold text-gray-700">🔔 Active Orders</h2>
 
-      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border">
-        暂无新订单，静候顾客扫码...
-      </div>
-
-      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md">
-        <div class="flex justify-between items-start border-b pb-3">
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border shadow-md space-y-3">
+        <div class="flex justify-between items-start border-b pb-2">
           <div>
-            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
-            <span class="text-xs px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-700">
-              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
-            </span>
+            <span class="text-2xl font-black text-amber-600">TABLE: {{ order.table_no }}</span>
+            <span class="ml-3 text-sm text-gray-500">Chk #: {{ order.check_no || '67280' }}</span>
           </div>
           <div class="text-right">
-            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
             <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
           </div>
         </div>
 
-        <div class="py-3 space-y-2">
+        <div class="space-y-1">
           <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
             <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
-            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              目标: {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
-            </span>
+            <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">{{ item.printer }}</span>
           </div>
         </div>
 
-        <div class="pt-2 border-t">
-          <button @click="markAsServed(order.id)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-bold shadow">
-            ✅ 已完成出菜
+        <!-- 结账按钮 -->
+        <div class="pt-2 border-t flex gap-2">
+          <button @click="openCheckoutModal(order)" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-bold shadow">
+            💳 Checkout & Print Receipt
           </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <div>
-      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面状态</h2>
-      <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3">
-        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border">
-          <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
-          <button v-if="table.status === 'Occupied'" @click="clearTable(table.table_no)" class="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
-            🧹 清桌
+  <!-- 结账与支付选择弹窗 -->
+  <div v-if="selectedOrder" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
+      <h3 class="text-xl font-bold border-b pb-2">Checkout - Table {{ selectedOrder.table_no }}</h3>
+      <div class="text-2xl font-black text-center text-emerald-600 my-2">
+        Total: RM {{ Number(selectedOrder.total_amount).toFixed(2) }}
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-bold text-gray-700">Select Payment Method:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'MasterCard', 'Debit Card']" :key="m"
+                  @click="paymentMethod = m"
+                  :class="['p-3 border rounded-xl font-bold text-sm', paymentMethod === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-700']">
+            {{ m }}
           </button>
         </div>
+      </div>
+
+      <div class="flex gap-2 pt-4">
+        <button @click="selectedOrder = null" class="w-1/2 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold">Cancel</button>
+        <button @click="confirmPayment" :disabled="!paymentMethod" class="w-1/2 bg-emerald-600 text-white py-3 rounded-xl font-bold disabled:opacity-50">Confirm & Print</button>
       </div>
     </div>
   </div>
@@ -89,33 +84,40 @@
   createApp({
     setup() {
       const pendingOrders = ref([]);
-      const tables = ref([]);
+      const selectedOrder = ref(null);
+      const paymentMethod = ref('');
       let supabaseClient = null;
-
-      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
 
       const fetchData = async () => {
         if (!supabaseClient) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const { data: oData } = await supabaseClient.from('orders').select('*').eq('status', 'Pending');
-        pendingOrders.value = oData || [];
-        const { data: tData } = await supabaseClient.from('tables').select('*');
-        tables.value = tData || [];
+        const { data } = await supabaseClient.from('orders').select('*').eq('status', 'Pending');
+        pendingOrders.value = data || [];
       };
 
-      const markAsServed = async (orderId) => {
-        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
+      const openCheckoutModal = (order) => {
+        selectedOrder.value = order;
+        paymentMethod.value = '';
+      };
+
+      const confirmPayment = async () => {
+        if (!selectedOrder.value || !paymentMethod.value) return;
+        
+        // 更新订单状态为已结账并记录支付方式
+        await supabaseClient.from('orders').update({
+          status: 'Paid',
+          payment_method: paymentMethod.value
+        }).eq('id', selectedOrder.value.id);
+
+        alert(`Payment Confirmed via ${paymentMethod.value}. Receipt sent to printer.`);
+        selectedOrder.value = null;
         fetchData();
       };
 
       onMounted(() => {
         fetchData();
-        window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-          .channel('db-changes')
-          .on('postgres_changes', { event: '*', table: 'orders' }, () => fetchData())
-          .subscribe();
       });
 
-      return { pendingOrders, tables, formatTime, markAsServed };
+      return { pendingOrders, selectedOrder, paymentMethod, openCheckoutModal, confirmPayment };
     }
   }).mount('#app');
 </script>
