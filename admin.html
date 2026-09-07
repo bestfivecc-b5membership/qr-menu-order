@@ -2,183 +2,228 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>POS Admin Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POS 柜台控制台</title>
+  <!-- Tailwind CSS & Vue 3 -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <style>[v-cloak] { display: none !important; }</style>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-100 p-6 font-sans">
+<body class="bg-gray-100 text-gray-800">
 
-<div id="app" v-cloak class="max-w-7xl mx-auto space-y-6">
-  <!-- 标头 -->
-  <header class="bg-slate-900 text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
-    <div>
-      <h1 class="text-2xl font-black">🖥️ 柜台订单控制台</h1>
-      <p class="text-xs text-slate-400 mt-1">按桌合并显示 · 独立发票结账</p>
-    </div>
-    <span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 rounded-full font-bold">● 系统运行中</span>
-  </header>
-
-  <!-- 桌号列表 -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div v-for="(orders, tableNo) in tableGroups" :key="tableNo" class="bg-white rounded-2xl shadow border p-5 flex flex-col justify-between space-y-4">
-      
+  <div id="app" class="p-6 max-w-7xl mx-auto">
+    <!-- 头部 -->
+    <header class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
       <div>
-        <div class="flex justify-between items-center border-b pb-3">
-          <span class="bg-amber-500 text-white font-black text-2xl px-3 py-1 rounded-xl">
-            TABLE: {{ tableNo }}
-          </span>
-          <span class="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-            加单 {{ orders.length }} 次
-          </span>
-        </div>
+        <h1 class="text-2xl font-bold text-gray-900">柜台控制台 (POS Console)</h1>
+        <p class="text-sm text-gray-500">实时未结账桌号汇总与一键结账</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></span>
+        <span class="text-sm font-medium text-gray-600">实时同步中</span>
+      </div>
+    </header>
 
-        <!-- 菜品列表 -->
-        <div class="mt-4 space-y-2 max-h-60 overflow-y-auto">
-          <div v-for="item in getCombinedItems(orders)" :key="item.name" class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border text-sm">
-            <span class="font-bold text-slate-800">{{ item.name }}</span>
-            <span class="font-black text-amber-600">x{{ item.qty }}</span>
+    <!-- 桌号卡片列表 -->
+    <div v-if="Object.keys(groupedTables).length === 0" class="text-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300">
+      当前暂无未结账桌号
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="(tableData, tableNo) in groupedTables" :key="tableNo" class="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col justify-between overflow-hidden">
+        <!-- 桌号头部 -->
+        <div>
+          <div class="bg-slate-800 text-white px-4 py-3 flex justify-between items-center">
+            <span class="text-lg font-bold">桌号: {{ tableNo }}</span>
+            <span class="text-xs bg-slate-700 px-2 py-1 rounded border border-slate-600">{{ tableData.orders.length }} 次下单</span>
+          </div>
+
+          <!-- 未结账菜品汇总 -->
+          <div class="p-4">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">未结账菜品明细</h3>
+            <div class="divide-y divide-gray-100 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in tableData.aggregatedItems" :key="idx" class="py-2 flex justify-between text-sm">
+                <div>
+                  <span class="font-medium text-gray-800">{{ item.name }}</span>
+                  <span class="text-xs text-gray-400 ml-1">x{{ item.qty }}</span>
+                </div>
+                <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- 结账卡片底部 -->
-      <div class="border-t pt-3 space-y-3">
-        <div class="flex justify-between items-center font-black">
-          <span class="text-slate-500">全单总额:</span>
-          <span class="text-2xl text-emerald-600">RM {{ getTableGrandTotal(orders).toFixed(2) }}</span>
-        </div>
-
-        <button @click="startCheckout(tableNo, orders)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-xl shadow transition">
-          💳 结账并打印发票
-        </button>
-      </div>
-
-    </div>
-
-    <div v-if="Object.keys(tableGroups).length === 0" class="col-span-full text-center py-20 bg-white rounded-2xl border text-slate-400 font-bold">
-      🍵 当前没有待结账桌号
-    </div>
-  </div>
-
-  <!-- 结账弹窗 -->
-  <div v-if="currentTable" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5">
-      <h3 class="text-xl font-black border-b pb-2">桌号 {{ currentTable }} 结账</h3>
-      
-      <div class="text-center bg-emerald-50 py-3 rounded-2xl border border-emerald-100">
-        <div class="text-xs text-emerald-600 font-bold">应收总计</div>
-        <div class="text-3xl font-black text-emerald-700">RM {{ currentTotal.toFixed(2) }}</div>
-      </div>
-
-      <div class="space-y-2">
-        <label class="block text-xs font-bold text-slate-600">选择支付方式：</label>
-        <div class="grid grid-cols-2 gap-2">
-          <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'MasterCard']" :key="m"
-                  @click="payMethod = m"
-                  :class="['py-2.5 text-xs font-bold rounded-xl border transition', payMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow' : 'bg-slate-50 text-slate-700']">
-            {{ m }}
+        <!-- 卡片底部 & 结账按钮 -->
+        <div class="p-4 bg-gray-50 border-t border-gray-100">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-sm text-gray-500">全单总计</span>
+            <span class="text-2xl font-black text-emerald-600">RM {{ tableData.totalAmount.toFixed(2) }}</span>
+          </div>
+          <button @click="openCheckoutModal(tableNo, tableData)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm">
+            结账 (Checkout)
           </button>
         </div>
       </div>
+    </div>
 
-      <div class="flex gap-2 pt-2">
-        <button @click="currentTable = null" class="w-1/2 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-xs">取消</button>
-        <button @click="finishCheckout" class="w-1/2 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">确认支付并清除</button>
+    <!-- 结账弹窗 Modal -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <h2 class="text-xl font-bold mb-1 text-gray-900">桌号 {{ currentModalTable }} 结账确认</h2>
+        <p class="text-sm text-gray-500 mb-4">请选择支付方式并确认收到金额</p>
+
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6 flex justify-between items-center">
+          <span class="text-emerald-800 font-medium">应收总额</span>
+          <span class="text-2xl font-bold text-emerald-700">RM {{ currentModalData.totalAmount.toFixed(2) }}</span>
+        </div>
+
+        <!-- 支付方式选择 -->
+        <label class="block text-sm font-medium text-gray-700 mb-2">支付方式 (Payment Method)</label>
+        <div class="grid grid-cols-3 gap-2 mb-6">
+          <button v-for="method in ['Cash', 'QR Pay', 'Visa / Card']" :key="method"
+                  @click="selectedPaymentMethod = method"
+                  :class="selectedPaymentMethod === method ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+                  class="py-2 border rounded-lg text-sm font-medium transition-colors">
+            {{ method }}
+          </button>
+        </div>
+
+        <!-- 弹窗底部按钮 -->
+        <div class="flex gap-3">
+          <button @click="showModal = false" class="flex-1 py-2.5 border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50">
+            取消
+          </button>
+          <button @click="confirmCheckout" :disabled="isSubmitting" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">
+            {{ isSubmitting ? '处理中...' : '确认结账并打单' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
-  const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-  const { createApp, ref, computed, onMounted } = Vue;
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
 
-  createApp({
-    setup() {
-      const pendingOrders = ref([]);
-      const currentTable = ref(null);
-      const currentOrders = ref([]);
-      const payMethod = ref('Cash');
-      let client = null;
+    // 配置 Supabase
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      const loadOrders = async () => {
-        if (!client) client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const { data } = await client.from('orders')
-          .select('*')
-          .eq('status', 'Pending')
-          .is('is_invoice', null);
-        pendingOrders.value = data || [];
-      };
+    createApp({
+      setup() {
+        const rawOrders = ref([]);
+        const showModal = ref(false);
+        const currentModalTable = ref('');
+        const currentModalData = ref({ totalAmount: 0, orders: [] });
+        const selectedPaymentMethod = ref('Cash');
+        const isSubmitting = ref(false);
 
-      const tableGroups = computed(() => {
-        const groups = {};
-        pendingOrders.value.forEach(o => {
-          if (!groups[o.table_no]) groups[o.table_no] = [];
-          groups[o.table_no].push(o);
-        });
-        return groups;
-      });
+        // 获取当前所有 status = 'unpaid' 的订单
+        const fetchOrders = async () => {
+          const { data, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('status', 'unpaid')
+            .order('created_at', { ascending: true });
 
-      const getCombinedItems = (orders) => {
-        const map = {};
-        orders.forEach(o => {
-          (o.items || []).forEach(i => {
-            if (!map[i.name]) map[i.name] = { ...i, qty: 0 };
-            map[i.name].qty += Number(i.qty);
+          if (!error && data) {
+            rawOrders.value = data;
+          }
+        };
+
+        // 按桌号分组合并逻辑
+        const groupedTables = computed(() => {
+          const groups = {};
+
+          rawOrders.value.forEach(order => {
+            const table = order.table_no;
+            if (!groups[table]) {
+              groups[table] = {
+                orders: [],
+                aggregatedItems: [],
+                totalAmount: 0
+              };
+            }
+
+            groups[table].orders.push(order);
+            groups[table].totalAmount += Number(order.total_amount || 0);
+
+            // 合并菜品与数量
+            (order.items || []).forEach(item => {
+              const existingItem = groups[table].aggregatedItems.find(i => i.name === item.name);
+              if (existingItem) {
+                existingItem.qty += item.qty;
+              } else {
+                groups[table].aggregatedItems.push({ ...item });
+              }
+            });
           });
-        });
-        return Object.values(map);
-      };
 
-      const getTableGrandTotal = (orders) => {
-        return orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      };
-
-      const currentTotal = computed(() => getTableGrandTotal(currentOrders.value));
-
-      const startCheckout = (tableNo, orders) => {
-        currentTable.value = tableNo;
-        currentOrders.value = orders;
-        payMethod.value = 'Cash';
-      };
-
-      const finishCheckout = async () => {
-        if (!currentTable.value) return;
-
-        const mergedItems = getCombinedItems(currentOrders.value);
-        const ids = currentOrders.value.map(o => o.id);
-
-        // 1. 将所有未结账订单更新为 Paid
-        await client.from('orders').update({ status: 'Paid' }).in('id', ids);
-
-        // 2. 插入发票纪录
-        await client.from('orders').insert({
-          table_no: currentTable.value,
-          items: mergedItems,
-          total_amount: currentTotal.value,
-          payment_method: payMethod.value,
-          status: 'Paid',
-          is_invoice: true
+          return groups;
         });
 
-        currentTable.value = null;
-        loadOrders();
-      };
+        // 订阅 Supabase 实时推送
+        const subscribeRealtime = () => {
+          supabaseClient
+            .channel('admin_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+              fetchOrders();
+            })
+            .subscribe();
+        };
 
-      onMounted(() => {
-        loadOrders();
-        client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        client.channel('admin-v2').on('postgres_changes', { event: '*', table: 'orders' }, () => {
-          loadOrders();
-        }).subscribe();
-      });
+        // 打开结账弹窗
+        const openCheckoutModal = (tableNo, tableData) => {
+          currentModalTable.value = tableNo;
+          currentModalData.value = tableData;
+          selectedPaymentMethod.value = 'Cash';
+          showModal.value = true;
+        };
 
-      return { tableGroups, getCombinedItems, getTableGrandTotal, currentTable, currentTotal, payMethod, startCheckout, finishCheckout };
-    }
-  }).mount('#app');
-</script>
+        // 确认结账
+        const confirmCheckout = async () => {
+          isSubmitting.value = true;
+          const orderIds = currentModalData.value.orders.map(o => o.id);
+
+          // 1. 合并全单菜品信息用于生成单一完整 INVOICE 记录（可选，此处通过触发最后一条记录更新打单）
+          // 2. 将该桌所有 unpaid 订单标记为 paid
+          const { error } = await supabaseClient
+            .from('orders')
+            .update({ 
+              status: 'paid',
+              payment_method: selectedPaymentMethod.value,
+              trigger_invoice_print: true // 告诉 Node.js 后端出 INVOICE
+            })
+            .in('id', orderIds);
+
+          isSubmitting.value = false;
+
+          if (!error) {
+            showModal.value = false;
+            fetchOrders(); // 刷新控制台
+          } else {
+            alert('结账失败: ' + error.message);
+          }
+        };
+
+        onMounted(() => {
+          fetchOrders();
+          subscribeRealtime();
+        });
+
+        return {
+          groupedTables,
+          showModal,
+          currentModalTable,
+          currentModalData,
+          selectedPaymentMethod,
+          isSubmitting,
+          openCheckoutModal,
+          confirmCheckout
+        };
+      }
+    }).mount('#app');
+  </script>
 </body>
 </html>
