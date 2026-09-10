@@ -15,31 +15,22 @@
 
 <div id="app" v-cloak class="max-w-6xl mx-auto">
 
-  <!-- 顶部控制栏 -->
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
     <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <span>🖥️</span> 柜台接单与打单控制台
-      </h1>
-      <p class="text-xs text-slate-400 mt-1">
-        状态: <span class="text-green-400 font-bold">● 实时监听中 (Realtime)</span> | 
-        打印模式: <span class="text-green-400 font-bold">● 双机分单原生直连 (BAR / KITCHEN)</span>
-      </p>
+      <h1 class="text-2xl font-bold flex items-center gap-2">🖥️ 柜台接单与打单控制台</h1>
+      <p class="text-xs text-slate-400 mt-1">状态: <span class="text-green-400 font-bold">● 实时监听中</span></p>
     </div>
     <div class="flex gap-3">
-      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">
-        🔊 开启接单提示音
-      </button>
+      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">🔊 开启提示音</button>
+      <button @click="fetchData" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-bold text-sm">🔄 刷新</button>
     </div>
   </header>
 
-  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">
-    ❌ {{ errorMessage }}
-  </div>
+  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">❌ {{ errorMessage }}</div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-    <!-- 待处理订单列表 -->
+    <!-- 待处理订单 -->
     <div class="md:col-span-2 space-y-4">
       <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
         <span>🔔 待处理订单</span>
@@ -50,7 +41,7 @@
         暂无新订单，静候顾客扫码...
       </div>
 
-      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md relative overflow-hidden">
+      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md">
         <div class="flex justify-between items-start border-b pb-3 border-gray-100">
           <div>
             <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
@@ -68,14 +59,14 @@
           <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
             <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
             <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              目标: {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
+              {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
             </span>
           </div>
         </div>
 
         <div class="flex gap-2 pt-2 border-t border-gray-100">
-          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow flex justify-center items-center gap-1">
-            <span>🖨️</span> 一键自动分单打印 (BAR + KITCHEN)
+          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
+            🖨️ 分单打印 (BAR + KITCHEN)
           </button>
           <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
             ✅ 已出菜
@@ -84,28 +75,39 @@
       </div>
     </div>
 
-    <!-- 桌台状态 -->
+    <!-- 桌台管理 & 结账 / Check 打单 -->
     <div>
-      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面开桌/结账状态</h2>
+      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面管理 & 结账出单</h2>
       <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-        <div v-for="table in tables" :key="table.table_no" class="flex justify-between items-center p-3 rounded-lg border" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
-          <div>
-            <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
-            <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
-              {{ table.status === 'Occupied' ? '🔴 使用中 (用餐中)' : '🟢 空闲' }}
+        <div v-for="table in tables" :key="table.table_no" class="p-3 rounded-lg border space-y-2" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
+              <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
+                {{ table.status === 'Occupied' ? '🔴 使用中' : '🟢 空闲' }}
+              </div>
+            </div>
+            <div class="text-xs font-bold text-emerald-700" v-if="table.status === 'Occupied'">
+              RM {{ getTableTotal(table.table_no).toFixed(2) }}
             </div>
           </div>
-          <button 
-            v-if="table.status === 'Occupied'"
-            @click="clearTable(table.table_no)"
-            class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow">
-            🧹 结账并清桌
-          </button>
+
+          <div v-if="table.status === 'Occupied'" class="flex gap-2 pt-1">
+            <button @click="printCheckReceipt(table.table_no)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs py-1.5 rounded font-bold">
+              📄 打查账单 (Check)
+            </button>
+            <button @click="checkoutAndPrintReceipt(table.table_no)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded font-bold">
+              💳 结账出单 (Receipt)
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
   </div>
+
+  <!-- 后台隐藏打印框架：避免弹出新窗口被 Chrome 拦截 -->
+  <iframe id="print-frame" style="display:none;"></iframe>
 
 </div>
 
@@ -118,12 +120,13 @@
   createApp({
     setup() {
       const pendingOrders = ref([]);
+      const allOrders = ref([]);
       const tables = ref([]);
       const errorMessage = ref('');
       let audioContext = null;
       let supabaseClient = null;
 
-      const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+      const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString() : '';
 
       const enableAudio = () => {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -156,9 +159,11 @@
             .select('*')
             .eq('status', 'Pending')
             .order('created_at', { ascending: false });
-
           if (oErr) throw oErr;
           pendingOrders.value = oData || [];
+
+          const { data: unPaid } = await supabaseClient.from('orders').select('*').neq('status', 'Paid');
+          allOrders.value = unPaid || [];
 
           const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
           if (tErr) throw tErr;
@@ -172,88 +177,128 @@
         if (!supabaseClient) return;
         supabaseClient
           .channel('schema-db-changes')
-          .on('postgres_changes', { event: 'INSERT', table: 'orders' }, payload => {
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
             playBeep();
             fetchData();
           })
           .subscribe();
       };
 
-      // 创建小票独立页面并唤起本地驱动打单
-      const printToDevice = (title, tableNo, items) => {
-        const printWindow = window.open('', '_blank', 'width=320,height=450');
-        if (!printWindow) {
-          alert("⚠️ 请在 Chrome 设置中允许允许此网站的【弹窗】，以便自动发送打印命令！");
-          return;
-        }
+      // 核心修改：无弹窗无拦截打印引擎
+      const printViaIframe = (title, tableNo, items, showTotal = false, totalAmount = 0) => {
+        const iframe = document.getElementById('print-frame');
+        const pri = iframe.contentWindow || iframe.contentDocument;
         
         let html = `
           <html>
           <head>
-            <title>${title}</title>
             <style>
-              body { font-family: 'Courier New', monospace; font-size: 13px; margin: 0; padding: 10px; color: #000; }
-              .title { text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 5px; }
-              .line { border-bottom: 1px dashed #000; margin: 8px 0; }
-              .item { display: flex; justify-content: space-between; font-size: 14px; margin: 4px 0; }
+              body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 5px; color: #000; }
+              .title { text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 5px; }
+              .line { border-bottom: 1px dashed #000; margin: 6px 0; }
+              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
               .bold { font-weight: bold; }
             </style>
           </head>
           <body>
             <div class="title">${title}</div>
             <div class="bold">桌号: ${tableNo}</div>
-            <div>时间: ${new Date().toLocaleTimeString()}</div>
+            <div>时间: ${new Date().toLocaleString()}</div>
             <div class="line"></div>
         `;
         
         items.forEach(i => {
-          html += `<div class="item"><span class="bold">${i.name}</span><span class="bold">x${i.qty}</span></div>`;
+          const priceText = showTotal ? `RM ${(i.price * i.qty).toFixed(2)}` : '';
+          html += `<div class="item"><span class="bold">${i.name} x${i.qty}</span><span class="bold">${priceText}</span></div>`;
         });
         
+        if (showTotal) {
+          html += `
+            <div class="line"></div>
+            <div class="item bold" style="font-size:14px;">
+              <span>TOTAL:</span>
+              <span>RM ${totalAmount.toFixed(2)}</span>
+            </div>
+          `;
+        }
+
         html += `
             <div class="line"></div>
-            <br><br><br><br>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function(){ window.close(); }, 500);
-              };
-            <\/script>
+            <div style="text-align:center; margin-top:8px;">~ 谢谢惠顾 ~</div>
           </body>
           </html>
         `;
-        printWindow.document.write(html);
-        printWindow.document.close();
+
+        pri.document.open();
+        pri.document.write(html);
+        pri.document.close();
+
+        // 框架渲染完毕后，唤起电脑打单
+        setTimeout(() => {
+          pri.focus();
+          pri.print();
+        }, 300);
       };
 
-      // 自动分单：判断属于水吧/厨房的菜品并分别触发
+      const getTableTotal = (tableNo) => {
+        const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
+        return tableOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+      };
+
+      const getTableItems = (tableNo) => {
+        const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
+        const map = {};
+        tableOrders.forEach(o => {
+          (o.items || []).forEach(i => {
+            if (map[i.name]) map[i.name].qty += i.qty;
+            else map[i.name] = { ...i };
+          });
+        });
+        return Object.values(map);
+      };
+
+      // 1. 按 Check 打印预结单
+      const printCheckReceipt = (tableNo) => {
+        const items = getTableItems(tableNo);
+        const total = getTableTotal(tableNo);
+        printViaIframe("=== 预结查账单 (CHECK) ===", tableNo, items, true, total);
+      };
+
+      // 2. 按 Receipt 打印发票并结账
+      const checkoutAndPrintReceipt = async (tableNo) => {
+        const items = getTableItems(tableNo);
+        const total = getTableTotal(tableNo);
+
+        printViaIframe("=== 正式发票 (RECEIPT) ===", tableNo, items, true, total);
+
+        const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
+        if (orderIds.length > 0) {
+          await supabaseClient.from('orders').update({ status: 'Paid' }).in('id', orderIds);
+        }
+        await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+
+        fetchData();
+      };
+
+      // 3. 厨房/水吧分单
       const printSplitReceipts = (order) => {
         const barItems = order.items.filter(i => i.printer === 'Bar');
         const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
 
-        // 发送水吧单
         if (barItems.length > 0) {
-          printToDevice("--- 水吧单 (BAR) ---", order.table_no, barItems);
+          printViaIframe("--- 水吧单 (BAR) ---", order.table_no, barItems, false);
         }
 
-        // 延迟 600ms 发送厨房单，防止窗口冲突
         if (kitchenItems.length > 0) {
           setTimeout(() => {
-            printToDevice("--- 厨房单 (KITCHEN) ---", order.table_no, kitchenItems);
-          }, 600);
+            printViaIframe("--- 厨房单 (KITCHEN) ---", order.table_no, kitchenItems, false);
+          }, 800);
         }
       };
 
       const markAsServed = async (orderId) => {
         await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
         fetchData();
-      };
-
-      const clearTable = async (tableNo) => {
-        if (confirm(`确定要为 ${tableNo} 桌结账并重置桌号吗？`)) {
-          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
-          fetchData();
-        }
       };
 
       onMounted(() => {
@@ -267,9 +312,12 @@
         errorMessage,
         formatTime,
         enableAudio,
+        fetchData,
+        getTableTotal,
+        printCheckReceipt,
+        checkoutAndPrintReceipt,
         printSplitReceipts,
-        markAsServed,
-        clearTable
+        markAsServed
       };
     }
   }).mount('#app');
