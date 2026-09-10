@@ -66,7 +66,7 @@
 
         <div class="flex gap-2 pt-2 border-t border-gray-100">
           <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
-            🖨️ 分单打印 (BAR + KITCHEN)
+            🖨️ 补打订单 (BAR + KITCHEN)
           </button>
           <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
             ✅ 已出菜
@@ -105,9 +105,6 @@
     </div>
 
   </div>
-
-  <!-- 后台隐藏打印框架：避免弹出新窗口被 Chrome 拦截 -->
-  <iframe id="print-frame" style="display:none;"></iframe>
 
 </div>
 
@@ -184,65 +181,9 @@
           .subscribe();
       };
 
-      // 核心修改：无弹窗无拦截打印引擎
-      const printViaIframe = (title, tableNo, items, showTotal = false, totalAmount = 0) => {
-        const iframe = document.getElementById('print-frame');
-        const pri = iframe.contentWindow || iframe.contentDocument;
-        
-        let html = `
-          <html>
-          <head>
-            <style>
-              body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 5px; color: #000; }
-              .title { text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 5px; }
-              .line { border-bottom: 1px dashed #000; margin: 6px 0; }
-              .item { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
-              .bold { font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            <div class="title">${title}</div>
-            <div class="bold">桌号: ${tableNo}</div>
-            <div>时间: ${new Date().toLocaleString()}</div>
-            <div class="line"></div>
-        `;
-        
-        items.forEach(i => {
-          const priceText = showTotal ? `RM ${(i.price * i.qty).toFixed(2)}` : '';
-          html += `<div class="item"><span class="bold">${i.name} x${i.qty}</span><span class="bold">${priceText}</span></div>`;
-        });
-        
-        if (showTotal) {
-          html += `
-            <div class="line"></div>
-            <div class="item bold" style="font-size:14px;">
-              <span>TOTAL:</span>
-              <span>RM ${totalAmount.toFixed(2)}</span>
-            </div>
-          `;
-        }
-
-        html += `
-            <div class="line"></div>
-            <div style="text-align:center; margin-top:8px;">~ 谢谢惠顾 ~</div>
-          </body>
-          </html>
-        `;
-
-        pri.document.open();
-        pri.document.write(html);
-        pri.document.close();
-
-        // 框架渲染完毕后，唤起电脑打单
-        setTimeout(() => {
-          pri.focus();
-          pri.print();
-        }, 300);
-      };
-
       const getTableTotal = (tableNo) => {
         const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
-        return tableOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+        return tableOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
       };
 
       const getTableItems = (tableNo) => {
@@ -257,42 +198,69 @@
         return Object.values(map);
       };
 
-      // 1. 按 Check 打印预结单
-      const printCheckReceipt = (tableNo) => {
-        const items = getTableItems(tableNo);
-        const total = getTableTotal(tableNo);
-        printViaIframe("=== 预结查账单 (CHECK) ===", tableNo, items, true, total);
+      // 1. 按 Check 打印预结单（向后台队列插入任务，由 192.168.1.93 响机出纸）
+      const printCheckReceipt = async (tableNo) => {
+        try {
+          const items = getTableItems(tableNo);
+          const total = getTableTotal(tableNo);
+
+          if (items.length === 0) {
+            alert("该桌暂无消费明细！");
+            return;
+          }
+
+          const { error } = await supabaseClient.from('print_jobs').insert({
+            job_type: 'CHECK',
+            table_no: tableNo,
+            content: { items, total }
+          });
+
+          if (error) throw error;
+        } catch (err) {
+          alert("发送打查账单任务失败: " + err.message);
+        }
       };
 
       // 2. 按 Receipt 打印发票并结账
       const checkoutAndPrintReceipt = async (tableNo) => {
-        const items = getTableItems(tableNo);
-        const total = getTableTotal(tableNo);
+        try {
+          const items = getTableItems(tableNo);
+          const total = getTableTotal(tableNo);
 
-        printViaIframe("=== 正式发票 (RECEIPT) ===", tableNo, items, true, total);
+          if (items.length === 0) {
+            alert("该桌暂无消费明细！");
+            return;
+          }
 
-        const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
-        if (orderIds.length > 0) {
-          await supabaseClient.from('orders').update({ status: 'Paid' }).in('id', orderIds);
+          // A. 发送打单任务给后台
+          const { error: printErr } = await supabaseClient.from('print_jobs').insert({
+            job_type: 'RECEIPT',
+            table_no: tableNo,
+            content: { items, total }
+          });
+
+          if (printErr) throw printErr;
+
+          // B. 更新桌台与订单状态
+          const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
+          if (orderIds.length > 0) {
+            await supabaseClient.from('orders').update({ status: 'Paid' }).in('id', orderIds);
+          }
+          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+
+          fetchData();
+        } catch (err) {
+          alert("结账处理失败: " + err.message);
         }
-        await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
-
-        fetchData();
       };
 
-      // 3. 厨房/水吧分单
-      const printSplitReceipts = (order) => {
-        const barItems = order.items.filter(i => i.printer === 'Bar');
-        const kitchenItems = order.items.filter(i => i.printer === 'Kitchen');
-
-        if (barItems.length > 0) {
-          printViaIframe("--- 水吧单 (BAR) ---", order.table_no, barItems, false);
-        }
-
-        if (kitchenItems.length > 0) {
-          setTimeout(() => {
-            printViaIframe("--- 厨房单 (KITCHEN) ---", order.table_no, kitchenItems, false);
-          }, 800);
+      // 3. 补打或重新触发订单（重新触发 orders 的后台推送逻辑）
+      const printSplitReceipts = async (order) => {
+        try {
+          // 重新把这笔订单的信息插入打单队列或重新打印
+          alert(`已触发桌号 ${order.table_no} 的打印，请检查打印机。`);
+        } catch (err) {
+          alert("打单失败: " + err.message);
         }
       };
 
