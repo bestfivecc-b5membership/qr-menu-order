@@ -3,409 +3,535 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>POS Counter Terminal</title>
+  <title>B5 Cuisine - Admin POS System</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <style>
-    [v-cloak] { display: none !important; }
-  </style>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 p-6">
-
-<div id="app" v-cloak class="max-w-6xl mx-auto">
-
-  <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
-    <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">🖥️ POS Counter Terminal</h1>
-      <p class="text-xs text-slate-400 mt-1">Status: <span class="text-green-400 font-bold">● Live Listening</span></p>
-    </div>
-    <div class="flex gap-3">
-      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">🔊 Enable Sound</button>
-      <button @click="fetchData" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-bold text-sm">🔄 Refresh</button>
-    </div>
-  </header>
-
-  <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">❌ {{ errorMessage }}</div>
-
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-    <!-- Incoming / Pending Orders Area -->
-    <div class="md:col-span-2 space-y-4">
-      <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
-        <span>🔔 Pending Orders</span>
-        <span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-bold">{{ pendingOrders.length }} New</span>
-      </h2>
-
-      <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border border-gray-200">
-        No pending orders. Waiting for QR scan...
-      </div>
-
-      <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md">
-        <div class="flex justify-between items-start border-b pb-3 border-gray-100">
-          <div>
-            <span class="text-2xl font-black text-amber-600 mr-2">Table: {{ order.table_no }}</span>
-            <span :class="['text-xs px-2 py-0.5 rounded font-bold', order.order_type === 'Dine-In' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700']">
-              {{ order.order_type === 'Dine-In' ? 'Dine-In' : 'Takeaway' }}
-            </span>
-          </div>
-          <div class="text-right">
-            <div class="text-xs text-gray-400">{{ formatTime(order.created_at) }}</div>
-            <div class="text-lg font-bold text-gray-800">Total: RM {{ Number(order.total_amount).toFixed(2) }}</div>
-          </div>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
+    
+    <!-- Top Header Bar -->
+    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6">
+      <div class="flex items-center space-x-3">
+        <div class="bg-amber-500 text-white p-2 rounded-lg">
+          <i class="fas fa-utensils text-xl"></i>
         </div>
-
-        <div class="py-3 space-y-2">
-          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-1">
-            <div class="flex items-center gap-2">
-              <button @click="removeItemFromOrder(order, idx)" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-1.5 py-0.5 rounded">✕</button>
-              <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
-            </div>
-            <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              {{ item.printer === 'Bar' ? 'BAR' : 'KITCHEN' }}
-            </span>
-          </div>
-        </div>
-
-        <div class="flex gap-2 pt-2 border-t border-gray-100">
-          <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
-            🖨️ Reprint Slips (BAR + KITCHEN)
-          </button>
-          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow">
-            ✅ Served
-          </button>
-          <button @click="cancelWholeOrder(order.id)" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow">
-            🚫 Cancel Order
-          </button>
+        <div>
+          <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
+          <p class="text-xs text-gray-500">Live Table & Order Monitor</p>
         </div>
       </div>
-    </div>
+      <div class="flex items-center space-x-3">
+        <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
+        </button>
+      </div>
+    </header>
 
-    <!-- Table Management -->
-    <div>
-      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ Table Management</h2>
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-        <div v-for="table in tables" :key="table.table_no" class="p-3 rounded-lg border space-y-2" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
-          <div class="flex justify-between items-center">
-            <div>
-              <div class="font-bold text-gray-800">Table {{ table.table_no }}</div>
-              <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
-                {{ table.status === 'Occupied' ? '🔴 Occupied' : '🟢 Available' }}
+    <!-- Main Grid Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Left 2 Cols: Table Management -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-th text-amber-500"></i> Floor Layout / Tables
+          </h2>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <div 
+              v-for="table in tables" 
+              :key="table.id"
+              @click="selectTable(table.table_no)"
+              :class="[
+                'p-4 rounded-xl cursor-pointer border-2 transition relative flex flex-col justify-between h-32',
+                selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-100',
+                getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-200' : 'bg-white hover:border-gray-300'
+              ]"
+            >
+              <div class="flex justify-between items-start">
+                <span class="font-bold text-lg text-gray-800">Table {{ table.table_no }}</span>
+                <span :class="[
+                  'px-2 py-0.5 text-xs font-semibold rounded-full',
+                  getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                ]">
+                  {{ getTableStatus(table.table_no) }}
+                </span>
+              </div>
+
+              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-2">
+                <p class="text-xs text-gray-500">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
+                <p class="text-sm font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
+              </div>
+              <div v-else class="text-xs text-gray-400">
+                Ready for seating
               </div>
             </div>
-            <div class="text-xs font-bold text-emerald-700" v-if="table.status === 'Occupied'">
-              RM {{ getTableTotal(table.table_no).toFixed(2) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Col: Selected Table Detail / Order Actions -->
+      <div class="space-y-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm sticky top-6">
+          <div v-if="selectedTable" class="space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 class="text-xl font-bold text-gray-800">Table {{ selectedTable }}</h3>
+                <p class="text-xs text-gray-500">Check#: <span class="font-bold text-amber-600">{{ getTableCheckNo(selectedTable) }}</span></p>
+              </div>
+              <button @click="selectedTable = null" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <!-- Transfer & Join Actions -->
+            <div v-if="getTableItems(selectedTable).length > 0" class="flex gap-2">
+              <button @click="openMoveModal('transfer')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
+                <i class="fas fa-exchange-alt"></i> Transfer Table
+              </button>
+              <button @click="openMoveModal('join')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
+                <i class="fas fa-object-group"></i> Join Table
+              </button>
+            </div>
+
+            <!-- Table Items List -->
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                <div class="flex-1">
+                  <p class="font-medium text-gray-800">{{ item.name }} x{{ item.qty }}</p>
+                  <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
+                  <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">
+                No active order items on this table.
+              </div>
+            </div>
+
+            <!-- Bill Calculations -->
+            <div v-if="getTableItems(selectedTable).length > 0" class="border-t pt-3 space-y-1.5 text-sm">
+              <div class="flex justify-between text-gray-500">
+                <span>Subtotal</span>
+                <span>RM {{ getTableSubtotal(selectedTable).toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between text-gray-500">
+                <span>Service Charge (10%)</span>
+                <span>RM {{ (getTableSubtotal(selectedTable) * 0.10).toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between text-lg font-bold text-gray-900 border-t pt-2">
+                <span>Total Due</span>
+                <span class="text-amber-600">RM {{ getTableTotal(selectedTable).toFixed(2) }}</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div v-if="getTableItems(selectedTable).length > 0" class="space-y-2 pt-2">
+              <div class="grid grid-cols-2 gap-3">
+                <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
+                  <i class="fas fa-print"></i> Print Check
+                </button>
+                <button @click="openPaymentModal(selectedTable)" class="py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
+                  <i class="fas fa-cash-register"></i> Checkout
+                </button>
+              </div>
+              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1 border border-red-200">
+                <i class="fas fa-ban"></i> Void Entire Order
+              </button>
             </div>
           </div>
 
-          <div v-if="table.status === 'Occupied'" class="space-y-1.5 pt-1">
-            <div class="flex gap-2">
-              <button @click="printCheckReceipt(table.table_no)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs py-1.5 rounded font-bold">
-                📄 Print Check
-              </button>
-              <button @click="openCheckoutModal(table.table_no)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded font-bold">
-                💳 Checkout
-              </button>
-            </div>
+          <div v-else class="text-center py-12 text-gray-400">
+            <i class="fas fa-mouse-pointer text-3xl mb-2 text-gray-300"></i>
+            <p>Select a table to view active orders or manage billing.</p>
           </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Payment Modal -->
+    <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+        <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
+        
+        <div class="bg-amber-50 p-3 rounded-lg flex justify-between items-center">
+          <span class="text-amber-800 font-medium">Grand Total</span>
+          <span class="text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button 
+              v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" 
+              :key="m" 
+              @click="selectedPayMethod = m"
+              :class="['py-2 text-xs font-semibold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']"
+            >
+              {{ m }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="selectedPayMethod === 'Cash'" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cash Received (RM)</label>
+            <input type="number" step="0.01" v-model.number="cashReceived" class="w-full border rounded-lg p-2.5 text-lg font-bold focus:ring-2 focus:ring-amber-500 outline-none" />
+          </div>
+          <div class="flex justify-between text-sm font-bold">
+            <span>Change Due:</span>
+            <span :class="cashChange >= 0 ? 'text-green-600' : 'text-red-600'">RM {{ cashChange.toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button @click="showPaymentModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300">Cancel</button>
+          <button @click="confirmCheckout" class="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow">Complete Paid & Print</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password Modal (for Deleting Items / Voiding Order) -->
+    <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-lock text-red-500"></i> Staff Authorization Required
+        </h3>
+        <p class="text-xs text-gray-500">Please enter manager/staff PIN to perform this action.</p>
+        <div>
+          <input type="password" v-model="staffPassword" placeholder="Enter PIN" class="w-full border rounded-lg p-2.5 text-center text-xl tracking-widest font-bold focus:ring-2 focus:ring-red-500 outline-none" />
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button @click="showPasswordModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+          <button @click="verifyPasswordAndExecute" class="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow text-sm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transfer / Join Table Modal -->
+    <div v-if="showMoveModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}
+        </h3>
+        <p class="text-xs text-gray-500">Select target table for current Table {{ selectedTable }} orders.</p>
+        
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Target Table</label>
+          <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500">
+            <option v-for="t in availableTargetTables" :key="t.table_no" :value="t.table_no">
+              Table {{ t.table_no }} ({{ getTableStatus(t.table_no) }})
+            </option>
+          </select>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+          <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm">Confirm Move</button>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Payment Modal -->
-  <div v-if="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="text-lg font-bold text-gray-800">💳 Payment - Table {{ selectedTable }}</h3>
-        <button @click="showPaymentModal = false" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
-      </div>
+  <script>
+    const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
+    const STAFF_PIN = "1234"; // 默认 Staff 密码
 
-      <div class="text-center py-2 bg-gray-50 rounded-lg">
-        <p class="text-xs text-gray-500">Total Payable</p>
-        <p class="text-3xl font-black text-emerald-600">RM {{ currentTableTotal.toFixed(2) }}</p>
-      </div>
+    const { createApp, ref, computed, onMounted } = Vue;
+    let supabaseClient = null;
 
-      <!-- Payment Options Grid (含 Debit Card) -->
-      <div class="grid grid-cols-2 gap-2">
-        <button @click="selectPayMethod('Cash')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Cash' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💵 Cash</button>
-        <button @click="selectPayMethod('QR Pay')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'QR Pay' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">📱 QR Pay</button>
-        <button @click="selectPayMethod('Visa')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Visa' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Visa</button>
-        <button @click="selectPayMethod('Mastercard')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Mastercard' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Mastercard</button>
-        <button @click="selectPayMethod('Debit Card')" :class="['col-span-2 py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Debit Card' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Debit Card</button>
-      </div>
+    createApp({
+      setup() {
+        const tables = ref([
+          { id: 1, table_no: 'A01' }, { id: 2, table_no: 'A02' }, { id: 3, table_no: 'A03' }, { id: 4, table_no: 'A04' },
+          { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
+        ]);
+        const allOrders = ref([]);
+        const selectedTable = ref(null);
+        const loading = ref(false);
 
-      <div v-if="selectedPayMethod === 'Cash'" class="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
-        <div class="flex justify-between items-center">
-          <label class="text-xs font-bold text-gray-700">Cash Received (RM):</label>
-          <input type="number" v-model.number="cashReceived" class="w-28 p-1.5 border rounded text-right font-bold text-gray-800">
-        </div>
-        <div class="flex justify-between items-center pt-1 border-t border-amber-200 text-sm">
-          <span class="font-bold text-gray-600">Change Due:</span>
-          <span :class="['font-black text-lg', cashChange >= 0 ? 'text-green-600' : 'text-red-500']">
-            RM {{ cashChange >= 0 ? cashChange.toFixed(2) : 'Insufficient' }}
-          </span>
-        </div>
-      </div>
+        // Modals
+        const showPaymentModal = ref(false);
+        const selectedPayMethod = ref('Cash');
+        const cashReceived = ref(0);
 
-      <button @click="confirmCheckout" :disabled="selectedPayMethod === 'Cash' && cashChange < 0" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white py-3 rounded-xl font-bold shadow">
-        Confirm & Print Receipt
-      </button>
-    </div>
-  </div>
+        const showPasswordModal = ref(false);
+        const staffPassword = ref('');
+        const pendingAction = ref(null); // 'delete_item' or 'void_order'
+        const pendingItemTarget = ref(null);
 
-</div>
+        const showMoveModal = ref(false);
+        const moveType = ref('transfer'); // 'transfer' or 'join'
+        const targetTableNo = ref('');
 
-<script>
-  const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
-  const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
+        const initSupabase = () => {
+          if (!supabaseClient) supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+          return supabaseClient;
+        };
 
-  const { createApp, ref, computed, onMounted } = Vue;
+        const fetchData = async () => {
+          loading.value = true;
+          try {
+            const client = initSupabase();
+            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            if (error) throw error;
+            allOrders.value = data || [];
+          } catch (err) {
+            console.error("Fetch Data Error:", err.message);
+          } finally {
+            loading.value = false;
+          }
+        };
 
-  createApp({
-    setup() {
-      const pendingOrders = ref([]);
-      const allOrders = ref([]);
-      const tables = ref([]);
-      const errorMessage = ref('');
-      
-      const showPaymentModal = ref(false);
-      const selectedTable = ref('');
-      const selectedPayMethod = ref('Cash');
-      const cashReceived = ref(0);
+        const subscribeRealtime = () => {
+          const client = initSupabase();
+          client
+            .channel('admin_realtime_orders')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+              fetchData();
+            })
+            .subscribe();
+        };
 
-      let audioContext = null;
-      let supabaseClient = null;
+        const getTableOrders = (tableNo) => {
+          return allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid');
+        };
 
-      const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString() : '';
+        const getTableStatus = (tableNo) => {
+          return getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
+        };
 
-      const generate6DigitCheckNo = () => {
-        return 'CHK' + Math.floor(100000 + Math.random() * 900000);
-      };
+        const getTableCheckNo = (tableNo) => {
+          const orders = getTableOrders(tableNo);
+          if (orders.length === 0) return '-';
+          const first = orders[0];
+          return first.check_no || first.order_no || `CHK-${first.id}`;
+        };
 
-      const enableAudio = () => {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        alert('✅ Audio alert activated!');
-      };
-
-      const initSupabase = () => {
-        const supabaseLib = window.supabase || window.supabaseJs;
-        return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
-      };
-
-      const fetchData = async () => {
-        try {
-          if (!supabaseClient) supabaseClient = initSupabase();
-
-          const { data: oData } = await supabaseClient
-            .from('orders')
-            .select('*')
-            .eq('status', 'Pending')
-            .order('created_at', { ascending: false });
-          pendingOrders.value = oData || [];
-
-          // 核心控制：只查未结账订单 (Pending & Served)
-          const { data: unPaid } = await supabaseClient
-            .from('orders')
-            .select('*')
-            .in('status', ['Pending', 'Served']);
-          allOrders.value = unPaid || [];
-
-          const { data: tData } = await supabaseClient.from('tables').select('*');
-          tables.value = tData || [];
-        } catch (err) {
-          errorMessage.value = 'Data fetch failed: ' + err.message;
-        }
-      };
-
-      const getTableTotal = (tableNo) => {
-        const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
-        return tableOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      };
-
-      const currentTableTotal = computed(() => getTableTotal(selectedTable.value));
-      
-      const cashChange = computed(() => {
-        return Number(cashReceived.value || 0) - currentTableTotal.value;
-      });
-
-      const getTableItems = (tableNo) => {
-        const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
-        const map = {};
-        tableOrders.forEach(o => {
-          (o.items || []).forEach(i => {
-            if (map[i.name]) map[i.name].qty += i.qty;
-            else map[i.name] = { ...i };
+        const getTableItems = (tableNo) => {
+          const orders = getTableOrders(tableNo);
+          let items = [];
+          orders.forEach(o => {
+            if (o.items && Array.isArray(o.items)) {
+              items = items.concat(o.items);
+            }
           });
+          return items;
+        };
+
+        const getTableSubtotal = (tableNo) => {
+          const items = getTableItems(tableNo);
+          return items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
+        };
+
+        const getTableTotal = (tableNo) => {
+          const sub = getTableSubtotal(tableNo);
+          return sub * 1.10;
+        };
+
+        const currentTableTotal = computed(() => {
+          return selectedTable.value ? getTableTotal(selectedTable.value) : 0;
         });
-        return Object.values(map);
-      };
 
-      // 1. 打预结账单 (Print Check)
-      const printCheckReceipt = async (tableNo) => {
-  try {
-    const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
-    if (activeOrders.length === 0) return alert("No items found for this table!");
+        const cashChange = computed(() => {
+          return Math.max(0, (cashReceived.value || 0) - currentTableTotal.value);
+        });
 
-    // 优先使用首个订单的 check_no 或 ID，确保整桌一致
-    const firstOrder = activeOrders[0];
-    const checkNo = firstOrder.check_no || `CHK-${firstOrder.id}`;
+        const availableTargetTables = computed(() => {
+          return tables.value.filter(t => t.table_no !== selectedTable.value);
+        });
 
-    const items = getTableItems(tableNo);
-    const total = getTableTotal(tableNo);
+        const selectTable = (tableNo) => {
+          selectedTable.value = tableNo;
+        };
 
-    await supabaseClient.from('print_jobs').insert({
-      job_type: 'CHECK',
-      table_no: tableNo,
-      content: { check_no: checkNo, items, total }
-    });
+        // --- 1. 删除单个菜品 & 删整单逻辑 ---
+        const requestDeleteItem = (item) => {
+          pendingAction.value = 'delete_item';
+          pendingItemTarget.value = item;
+          staffPassword.value = '';
+          showPasswordModal.value = true;
+        };
 
-    alert(`Check bill sent for Table ${tableNo} [${checkNo}]`);
-  } catch (err) {
-    alert("Print check failed: " + err.message);
-  }
-};
+        const requestVoidOrder = () => {
+          pendingAction.value = 'void_order';
+          staffPassword.value = '';
+          showPasswordModal.value = true;
+        };
 
-      // 2. 打开结账窗口
-      const openCheckoutModal = (tableNo) => {
-        if (getTableItems(tableNo).length === 0) return alert("No items found for this table!");
-        selectedTable.value = tableNo;
-        selectedPayMethod.value = 'Cash';
-        cashReceived.value = Math.ceil(getTableTotal(tableNo));
-        showPaymentModal.value = true;
-      };
+        const verifyPasswordAndExecute = async () => {
+          if (staffPassword.value !== STAFF_PIN) {
+            return alert("Invalid Staff Password!");
+          }
+          showPasswordModal.value = false;
 
-      const selectPayMethod = (method) => {
-        selectedPayMethod.value = method;
-      };
+          const client = initSupabase();
+          const activeOrders = getTableOrders(selectedTable.value);
 
-      // 3. 确认结账 (清空与完成)
-      const confirmCheckout = async () => {
-  try {
-    const tableNo = selectedTable.value;
-    const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
-    const firstOrder = activeOrders[0];
-    
-    // 使用跟前面 Check Bill 完全一致的单号
-    const checkNo = firstOrder?.check_no || (firstOrder?.id ? `CHK-${firstOrder.id}` : generate6DigitCheckNo());
+          if (pendingAction.value === 'void_order') {
+            const ids = activeOrders.map(o => o.id);
+            await client.from('orders').delete().in('id', ids);
+            await fetchData();
+            alert(`Order for Table ${selectedTable.value} has been voided.`);
+          } else if (pendingAction.value === 'delete_item') {
+            const target = pendingItemTarget.value;
+            // 找到包含该菜品的 order 并移除
+            for (const order of activeOrders) {
+              if (order.items && order.items.some(i => i.name === target.name)) {
+                const updatedItems = order.items.filter(i => i !== target);
+                if (updatedItems.length === 0) {
+                  await client.from('orders').delete().eq('id', order.id);
+                } else {
+                  await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
+                }
+                break;
+              }
+            }
+            await fetchData();
+          }
+        };
 
-    const items = getTableItems(tableNo);
-    const total = currentTableTotal.value;
+        // --- 2. 换桌 & 合单逻辑 ---
+        const openMoveModal = (type) => {
+          moveType.value = type;
+          const firstAvail = availableTargetTables.value[0];
+          targetTableNo.value = firstAvail ? firstAvail.table_no : '';
+          showMoveModal.value = true;
+        };
 
-    await supabaseClient.from('print_jobs').insert({
-      job_type: 'RECEIPT',
-      table_no: tableNo,
-      content: { 
-        check_no: checkNo,
-        items, 
-        total, 
-        pay_method: selectedPayMethod.value,
-        cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
-        cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
+        const confirmTableMove = async () => {
+          if (!targetTableNo.value) return;
+          const client = initSupabase();
+          const activeOrders = getTableOrders(selectedTable.value);
+          const ids = activeOrders.map(o => o.id);
+
+          await client.from('orders').update({ table_no: targetTableNo.value }).in('id', ids);
+          showMoveModal.value = false;
+          selectedTable.value = targetTableNo.value;
+          await fetchData();
+          alert(`Table successfully updated to ${targetTableNo.value}!`);
+        };
+
+        // --- 3. 结账逻辑 ---
+        const printCheckReceipt = async (tableNo) => {
+          try {
+            const activeOrders = getTableOrders(tableNo);
+            if (activeOrders.length === 0) return alert("No active orders found!");
+
+            const checkNo = getTableCheckNo(tableNo);
+            const items = getTableItems(tableNo);
+            const total = getTableTotal(tableNo);
+
+            const client = initSupabase();
+            await client.from('print_jobs').insert({
+              job_type: 'CHECK',
+              table_no: tableNo,
+              content: { check_no: checkNo, items, total, pax: 1 }
+            });
+
+            alert(`Check Bill sent to printer for Table ${tableNo} [${checkNo}]`);
+          } catch (err) {
+            alert("Print Check Bill Failed: " + err.message);
+          }
+        };
+
+        const openPaymentModal = (tableNo) => {
+          selectedTable.value = tableNo;
+          cashReceived.value = Math.ceil(getTableTotal(tableNo));
+          selectedPayMethod.value = 'Cash';
+          showPaymentModal.value = true;
+        };
+
+        const confirmCheckout = async () => {
+          try {
+            const tableNo = selectedTable.value;
+            const activeOrders = getTableOrders(tableNo);
+            if (activeOrders.length === 0) return;
+
+            const checkNo = getTableCheckNo(tableNo);
+            const items = getTableItems(tableNo);
+            const total = currentTableTotal.value;
+
+            const client = initSupabase();
+
+            await client.from('print_jobs').insert({
+              job_type: 'RECEIPT',
+              table_no: tableNo,
+              content: { 
+                check_no: checkNo,
+                items, 
+                total, 
+                pay_method: selectedPayMethod.value,
+                cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
+                cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0,
+                pax: 1
+              }
+            });
+
+            const orderIds = activeOrders.map(o => o.id);
+            await client.from('orders').update({ 
+              status: 'Paid',
+              pay_method: selectedPayMethod.value 
+            }).in('id', orderIds);
+
+            showPaymentModal.value = false;
+            await fetchData();
+            alert(`Table ${tableNo} Checkout Completed via ${selectedPayMethod.value}!`);
+          } catch (err) {
+            alert("Checkout Failed: " + err.message);
+          }
+        };
+
+        onMounted(() => {
+          fetchData();
+          subscribeRealtime();
+        });
+
+        return {
+          tables,
+          allOrders,
+          selectedTable,
+          loading,
+          showPaymentModal,
+          selectedPayMethod,
+          cashReceived,
+          cashChange,
+          currentTableTotal,
+          showPasswordModal,
+          staffPassword,
+          showMoveModal,
+          moveType,
+          targetTableNo,
+          availableTargetTables,
+          fetchData,
+          getTableStatus,
+          getTableCheckNo,
+          getTableItems,
+          getTableSubtotal,
+          getTableTotal,
+          selectTable,
+          requestDeleteItem,
+          requestVoidOrder,
+          verifyPasswordAndExecute,
+          openMoveModal,
+          confirmTableMove,
+          printCheckReceipt,
+          openPaymentModal,
+          confirmCheckout
+        };
       }
-    });
-
-    const orderIds = activeOrders.map(o => o.id);
-    if (orderIds.length > 0) {
-      await supabaseClient.from('orders').update({ 
-        status: 'Paid',
-        pay_method: selectedPayMethod.value 
-      }).in('id', orderIds);
-    }
-
-    await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
-
-    showPaymentModal.value = false;
-    await fetchData();
-    alert(`Table ${tableNo} Checkout Complete!`);
-  } catch (err) {
-    alert("Checkout failed: " + err.message);
-  }
-};
-
-      // 4. Reprint 补打
-      const printSplitReceipts = async (order) => {
-        try {
-          const checkNo = order.check_no || generate6DigitCheckNo();
-          const orderData = {
-            table_no: order.table_no,
-            check_no: checkNo,
-            items: order.items || []
-          };
-
-          await supabaseClient.from('print_jobs').insert({
-            job_type: 'REPRINT_BAR',
-            table_no: order.table_no,
-            content: orderData
-          });
-
-          await supabaseClient.from('print_jobs').insert({
-            job_type: 'REPRINT_KITCHEN',
-            table_no: order.table_no,
-            content: orderData
-          });
-
-          alert(`Reprint request sent for Table ${order.table_no}!`);
-        } catch (err) {
-          alert("Reprint failed: " + err.message);
-        }
-      };
-
-      const markAsServed = async (orderId) => {
-        await supabaseClient.from('orders').update({ status: 'Served' }).eq('id', orderId);
-        fetchData();
-      };
-
-      const removeItemFromOrder = async (order, index) => {
-        if (!confirm("Remove item?")) return;
-        const updatedItems = [...order.items];
-        updatedItems.splice(index, 1);
-        if (updatedItems.length === 0) {
-          await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', order.id);
-        } else {
-          const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price || 0) * item.qty), 0);
-          await supabaseClient.from('orders').update({ items: updatedItems, total_amount: newTotal }).eq('id', order.id);
-        }
-        fetchData();
-      };
-
-      const cancelWholeOrder = async (orderId) => {
-        if (!confirm("Cancel order?")) return;
-        await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', orderId);
-        fetchData();
-      };
-
-      onMounted(() => {
-        fetchData();
-      });
-
-      return {
-        pendingOrders,
-        tables,
-        errorMessage,
-        showPaymentModal,
-        selectedTable,
-        selectedPayMethod,
-        cashReceived,
-        currentTableTotal,
-        cashChange,
-        formatTime,
-        enableAudio,
-        fetchData,
-        getTableTotal,
-        printCheckReceipt,
-        openCheckoutModal,
-        selectPayMethod,
-        confirmCheckout,
-        printSplitReceipts,
-        markAsServed,
-        removeItemFromOrder,
-        cancelWholeOrder
-      };
-    }
-  }).mount('#app');
-</script>
-
+    }).mount('#app');
+  </script>
 </body>
 </html>
