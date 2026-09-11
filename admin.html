@@ -133,7 +133,7 @@
         <p class="text-3xl font-black text-emerald-600">RM {{ currentTableTotal.toFixed(2) }}</p>
       </div>
 
-      <!-- Payment Options Grid (Included Visa & Mastercard) -->
+      <!-- Payment Options Grid -->
       <div class="grid grid-cols-2 gap-2">
         <button @click="selectPayMethod('Cash')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Cash' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💵 Cash</button>
         <button @click="selectPayMethod('QR Pay')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'QR Pay' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">📱 QR Pay</button>
@@ -238,6 +238,7 @@
         try {
           if (!supabaseClient) supabaseClient = initSupabase();
 
+          // 1. 获取未处理订单 (Pending)
           const { data: oData, error: oErr } = await supabaseClient
             .from('orders')
             .select('*')
@@ -246,9 +247,14 @@
           if (oErr) throw oErr;
           pendingOrders.value = oData || [];
 
-          const { data: unPaid } = await supabaseClient.from('orders').select('*').neq('status', 'Paid').neq('status', 'Cancelled');
+          // 2. 修复点1：仅获取未结账且未取消的订单 (Pending & Served)
+          const { data: unPaid } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .in('status', ['Pending', 'Served']);
           allOrders.value = unPaid || [];
 
+          // 3. 获取所有桌台信息
           const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
           if (tErr) throw tErr;
           tables.value = tData || [];
@@ -306,7 +312,11 @@
           const { error } = await supabaseClient.from('print_jobs').insert({
             job_type: 'CHECK',
             table_no: tableNo,
-            content: { items, total }
+            content: { 
+              check_no: `CHK-${tableNo}-${Date.now().toString().slice(-4)}`,
+              items, 
+              total 
+            }
           });
 
           if (error) throw error;
@@ -316,7 +326,7 @@
         }
       };
 
-      // 2. Checkout & Payment
+      // 2. Checkout & Payment (结账修复)
       const openCheckoutModal = (tableNo) => {
         if (getTableItems(tableNo).length === 0) return alert("No items found for this table!");
         selectedTable.value = tableNo;
@@ -335,10 +345,14 @@
           const items = getTableItems(tableNo);
           const total = currentTableTotal.value;
 
+          const checkNo = `CHK-${tableNo}-${Date.now().toString().slice(-4)}`;
+
+          // A. 发送结账发票打印任务
           const { error: printErr } = await supabaseClient.from('print_jobs').insert({
             job_type: 'RECEIPT',
             table_no: tableNo,
             content: { 
+              check_no: checkNo,
               items, 
               total, 
               pay_method: selectedPayMethod.value,
@@ -349,6 +363,7 @@
 
           if (printErr) throw printErr;
 
+          // B. 更新订单状态为 Paid (解决金额不清零核心)
           const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
           if (orderIds.length > 0) {
             await supabaseClient.from('orders').update({ 
@@ -356,10 +371,14 @@
               pay_method: selectedPayMethod.value 
             }).in('id', orderIds);
           }
+
+          // C. 更新桌子状态为 Empty
           await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
 
           showPaymentModal.value = false;
-          fetchData();
+          // D. 强制重新拉取数据刷新界面
+          await fetchData();
+          alert(`Table ${tableNo} checkout complete! Receipt sent.`);
         } catch (err) {
           alert("Checkout failed: " + err.message);
         }
@@ -427,8 +446,35 @@
         }
       };
 
+      // 5. 修复点2：补全 Reprint 补打水吧与厨房单逻辑
       const printSplitReceipts = async (order) => {
-        alert(`Kitchen and Bar print job triggered for Table ${order.table_no}.`);
+        try {
+          const checkNo = `CHK-${order.table_no}-${Date.now().toString().slice(-4)}`;
+          const orderData = {
+            table_no: order.table_no,
+            check_no: checkNo,
+            items: order.items || [],
+            order_type: order.order_type || 'Dine-In'
+          };
+
+          // 向 print_jobs 写入水吧补打任务
+          await supabaseClient.from('print_jobs').insert({
+            job_type: 'REPRINT_BAR',
+            table_no: order.table_no,
+            content: orderData
+          });
+
+          // 向 print_jobs 写入厨房补打任务
+          await supabaseClient.from('print_jobs').insert({
+            job_type: 'REPRINT_KITCHEN',
+            table_no: order.table_no,
+            content: orderData
+          });
+
+          alert(`Reprint request for Table ${order.table_no} sent to Bar & Kitchen printers!`);
+        } catch (err) {
+          alert("Failed to send reprint jobs: " + err.message);
+        }
       };
 
       const markAsServed = async (orderId) => {
