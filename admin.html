@@ -244,31 +244,28 @@
 
       // 1. 打预结账单 (Print Check)
       const printCheckReceipt = async (tableNo) => {
-        try {
-          const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
-          if (activeOrders.length === 0) return alert("No items found for this table!");
+  try {
+    const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
+    if (activeOrders.length === 0) return alert("No items found for this table!");
 
-          let checkNo = activeOrders[0].check_no;
-          if (!checkNo) {
-            checkNo = generate6DigitCheckNo();
-            const ids = activeOrders.map(o => o.id);
-            await supabaseClient.from('orders').update({ check_no: checkNo }).in('id', ids);
-          }
+    // 优先使用首个订单的 check_no 或 ID，确保整桌一致
+    const firstOrder = activeOrders[0];
+    const checkNo = firstOrder.check_no || `CHK-${firstOrder.id}`;
 
-          const items = getTableItems(tableNo);
-          const total = getTableTotal(tableNo);
+    const items = getTableItems(tableNo);
+    const total = getTableTotal(tableNo);
 
-          await supabaseClient.from('print_jobs').insert({
-            job_type: 'CHECK',
-            table_no: tableNo,
-            content: { check_no: checkNo, items, total }
-          });
+    await supabaseClient.from('print_jobs').insert({
+      job_type: 'CHECK',
+      table_no: tableNo,
+      content: { check_no: checkNo, items, total }
+    });
 
-          alert(`Check bill sent for Table ${tableNo} [${checkNo}]`);
-        } catch (err) {
-          alert("Print check failed: " + err.message);
-        }
-      };
+    alert(`Check bill sent for Table ${tableNo} [${checkNo}]`);
+  } catch (err) {
+    alert("Print check failed: " + err.message);
+  }
+};
 
       // 2. 打开结账窗口
       const openCheckoutModal = (tableNo) => {
@@ -285,47 +282,47 @@
 
       // 3. 确认结账 (清空与完成)
       const confirmCheckout = async () => {
-        try {
-          const tableNo = selectedTable.value;
-          const items = getTableItems(tableNo);
-          const total = currentTableTotal.value;
+  try {
+    const tableNo = selectedTable.value;
+    const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
+    const firstOrder = activeOrders[0];
+    
+    // 使用跟前面 Check Bill 完全一致的单号
+    const checkNo = firstOrder?.check_no || (firstOrder?.id ? `CHK-${firstOrder.id}` : generate6DigitCheckNo());
 
-          const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
-          const checkNo = activeOrders[0]?.check_no || generate6DigitCheckNo();
+    const items = getTableItems(tableNo);
+    const total = currentTableTotal.value;
 
-          // A. 发送正式发票打印
-          await supabaseClient.from('print_jobs').insert({
-            job_type: 'RECEIPT',
-            table_no: tableNo,
-            content: { 
-              check_no: checkNo,
-              items, 
-              total, 
-              pay_method: selectedPayMethod.value,
-              cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
-              cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
-            }
-          });
+    await supabaseClient.from('print_jobs').insert({
+      job_type: 'RECEIPT',
+      table_no: tableNo,
+      content: { 
+        check_no: checkNo,
+        items, 
+        total, 
+        pay_method: selectedPayMethod.value,
+        cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
+        cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
+      }
+    });
 
-          // B. 将所有已结账订单标记为 Paid
-          const orderIds = activeOrders.map(o => o.id);
-          if (orderIds.length > 0) {
-            await supabaseClient.from('orders').update({ 
-              status: 'Paid',
-              pay_method: selectedPayMethod.value 
-            }).in('id', orderIds);
-          }
+    const orderIds = activeOrders.map(o => o.id);
+    if (orderIds.length > 0) {
+      await supabaseClient.from('orders').update({ 
+        status: 'Paid',
+        pay_method: selectedPayMethod.value 
+      }).in('id', orderIds);
+    }
 
-          // C. 清空桌台状态
-          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
+    await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
 
-          showPaymentModal.value = false;
-          await fetchData();
-          alert(`Table ${tableNo} Checkout Complete!`);
-        } catch (err) {
-          alert("Checkout failed: " + err.message);
-        }
-      };
+    showPaymentModal.value = false;
+    await fetchData();
+    alert(`Table ${tableNo} Checkout Complete!`);
+  } catch (err) {
+    alert("Checkout failed: " + err.message);
+  }
+};
 
       // 4. Reprint 补打
       const printSplitReceipts = async (order) => {
