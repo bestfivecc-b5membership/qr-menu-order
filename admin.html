@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>POS Counter & Order Control Terminal</title>
+  <title>POS Counter Terminal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -15,7 +15,6 @@
 
 <div id="app" v-cloak class="max-w-6xl mx-auto">
 
-  <!-- Header Section -->
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
     <div>
       <h1 class="text-2xl font-bold flex items-center gap-2">🖥️ POS Counter Terminal</h1>
@@ -27,7 +26,6 @@
     </div>
   </header>
 
-  <!-- Error Alert -->
   <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">❌ {{ errorMessage }}</div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -57,11 +55,10 @@
           </div>
         </div>
 
-        <!-- Order Items Breakdown & Item Deletion -->
         <div class="py-3 space-y-2">
           <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-1">
             <div class="flex items-center gap-2">
-              <button @click="removeItemFromOrder(order, idx)" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-1.5 py-0.5 rounded" title="Remove Item">✕</button>
+              <button @click="removeItemFromOrder(order, idx)" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-1.5 py-0.5 rounded">✕</button>
               <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
             </div>
             <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
@@ -84,7 +81,7 @@
       </div>
     </div>
 
-    <!-- Table Management & Settlement -->
+    <!-- Table Management -->
     <div>
       <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ Table Management</h2>
       <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
@@ -110,9 +107,6 @@
                 💳 Checkout
               </button>
             </div>
-            <button @click="openChangeTableModal(table.table_no)" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs py-1 rounded font-bold">
-              🔄 Move / Change Table
-            </button>
           </div>
         </div>
       </div>
@@ -120,7 +114,7 @@
 
   </div>
 
-  <!-- Payment & Cash Change Modal -->
+  <!-- Payment Modal -->
   <div v-if="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
@@ -133,19 +127,19 @@
         <p class="text-3xl font-black text-emerald-600">RM {{ currentTableTotal.toFixed(2) }}</p>
       </div>
 
-      <!-- Payment Options Grid -->
+      <!-- Payment Options Grid (含 Debit Card) -->
       <div class="grid grid-cols-2 gap-2">
         <button @click="selectPayMethod('Cash')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Cash' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💵 Cash</button>
         <button @click="selectPayMethod('QR Pay')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'QR Pay' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">📱 QR Pay</button>
         <button @click="selectPayMethod('Visa')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Visa' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Visa</button>
         <button @click="selectPayMethod('Mastercard')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Mastercard' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Mastercard</button>
+        <button @click="selectPayMethod('Debit Card')" :class="['col-span-2 py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Debit Card' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Debit Card</button>
       </div>
 
-      <!-- Cash Calculator -->
       <div v-if="selectedPayMethod === 'Cash'" class="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
         <div class="flex justify-between items-center">
           <label class="text-xs font-bold text-gray-700">Cash Received (RM):</label>
-          <input type="number" v-model.number="cashReceived" class="w-28 p-1.5 border rounded text-right font-bold text-gray-800" placeholder="e.g. 100">
+          <input type="number" v-model.number="cashReceived" class="w-28 p-1.5 border rounded text-right font-bold text-gray-800">
         </div>
         <div class="flex justify-between items-center pt-1 border-t border-amber-200 text-sm">
           <span class="font-bold text-gray-600">Change Due:</span>
@@ -158,26 +152,6 @@
       <button @click="confirmCheckout" :disabled="selectedPayMethod === 'Cash' && cashChange < 0" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white py-3 rounded-xl font-bold shadow">
         Confirm & Print Receipt
       </button>
-    </div>
-  </div>
-
-  <!-- Change Table Modal -->
-  <div v-if="showChangeTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-      <h3 class="text-lg font-bold text-gray-800 border-b pb-2">🔄 Change / Move Table</h3>
-      <p class="text-sm text-gray-600">Move orders from <span class="font-bold text-amber-600">Table {{ sourceTable }}</span> to:</p>
-      
-      <select v-model="targetTable" class="w-full p-2.5 border rounded-lg font-bold text-gray-800">
-        <option value="" disabled>Select Target Table</option>
-        <option v-for="t in availableTables" :key="t.table_no" :value="t.table_no">
-          Table {{ t.table_no }} {{ t.status === 'Occupied' ? '(Merge Orders)' : '(Empty)' }}
-        </option>
-      </select>
-
-      <div class="flex gap-2 pt-2">
-        <button @click="showChangeTableModal = false" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">Cancel</button>
-        <button @click="confirmChangeTable" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg text-sm font-bold shadow">Confirm Move</button>
-      </div>
     </div>
   </div>
 
@@ -196,41 +170,27 @@
       const tables = ref([]);
       const errorMessage = ref('');
       
-      // Payment & Cash State
       const showPaymentModal = ref(false);
       const selectedTable = ref('');
       const selectedPayMethod = ref('Cash');
       const cashReceived = ref(0);
-
-      // Change Table State
-      const showChangeTableModal = ref(false);
-      const sourceTable = ref('');
-      const targetTable = ref('');
 
       let audioContext = null;
       let supabaseClient = null;
 
       const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString() : '';
 
+      const generate6DigitCheckNo = () => {
+        return 'CHK' + Math.floor(100000 + Math.random() * 900000);
+      };
+
       const enableAudio = () => {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         alert('✅ Audio alert activated!');
       };
 
-      const playBeep = () => {
-        if (!audioContext) return;
-        try {
-          const osc = audioContext.createOscillator();
-          osc.connect(audioContext.destination);
-          osc.frequency.value = 880;
-          osc.start();
-          osc.stop(audioContext.currentTime + 0.3);
-        } catch(e) {}
-      };
-
       const initSupabase = () => {
         const supabaseLib = window.supabase || window.supabaseJs;
-        if (!supabaseLib) throw new Error("Failed to load Supabase SDK");
         return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
       };
 
@@ -238,40 +198,25 @@
         try {
           if (!supabaseClient) supabaseClient = initSupabase();
 
-          // 1. 获取未处理订单 (Pending)
-          const { data: oData, error: oErr } = await supabaseClient
+          const { data: oData } = await supabaseClient
             .from('orders')
             .select('*')
             .eq('status', 'Pending')
             .order('created_at', { ascending: false });
-          if (oErr) throw oErr;
           pendingOrders.value = oData || [];
 
-          // 2. 修复点1：仅获取未结账且未取消的订单 (Pending & Served)
+          // 核心控制：只查未结账订单 (Pending & Served)
           const { data: unPaid } = await supabaseClient
             .from('orders')
             .select('*')
             .in('status', ['Pending', 'Served']);
           allOrders.value = unPaid || [];
 
-          // 3. 获取所有桌台信息
-          const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
-          if (tErr) throw tErr;
+          const { data: tData } = await supabaseClient.from('tables').select('*');
           tables.value = tData || [];
         } catch (err) {
           errorMessage.value = 'Data fetch failed: ' + err.message;
         }
-      };
-
-      const subscribeRealtime = () => {
-        if (!supabaseClient) return;
-        supabaseClient
-          .channel('schema-db-changes')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
-            playBeep();
-            fetchData();
-          })
-          .subscribe();
       };
 
       const getTableTotal = (tableNo) => {
@@ -283,10 +228,6 @@
       
       const cashChange = computed(() => {
         return Number(cashReceived.value || 0) - currentTableTotal.value;
-      });
-
-      const availableTables = computed(() => {
-        return tables.value.filter(t => t.table_no !== sourceTable.value);
       });
 
       const getTableItems = (tableNo) => {
@@ -301,32 +242,35 @@
         return Object.values(map);
       };
 
-      // 1. Print Check Bill
+      // 1. 打预结账单 (Print Check)
       const printCheckReceipt = async (tableNo) => {
         try {
+          const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
+          if (activeOrders.length === 0) return alert("No items found for this table!");
+
+          let checkNo = activeOrders[0].check_no;
+          if (!checkNo) {
+            checkNo = generate6DigitCheckNo();
+            const ids = activeOrders.map(o => o.id);
+            await supabaseClient.from('orders').update({ check_no: checkNo }).in('id', ids);
+          }
+
           const items = getTableItems(tableNo);
           const total = getTableTotal(tableNo);
 
-          if (items.length === 0) return alert("No items found for this table!");
-
-          const { error } = await supabaseClient.from('print_jobs').insert({
+          await supabaseClient.from('print_jobs').insert({
             job_type: 'CHECK',
             table_no: tableNo,
-            content: { 
-              check_no: `CHK-${tableNo}-${Date.now().toString().slice(-4)}`,
-              items, 
-              total 
-            }
+            content: { check_no: checkNo, items, total }
           });
 
-          if (error) throw error;
-          alert(`Check bill print job sent for Table ${tableNo}`);
+          alert(`Check bill sent for Table ${tableNo} [${checkNo}]`);
         } catch (err) {
-          alert("Failed to send check bill job: " + err.message);
+          alert("Print check failed: " + err.message);
         }
       };
 
-      // 2. Checkout & Payment (结账修复)
+      // 2. 打开结账窗口
       const openCheckoutModal = (tableNo) => {
         if (getTableItems(tableNo).length === 0) return alert("No items found for this table!");
         selectedTable.value = tableNo;
@@ -339,16 +283,18 @@
         selectedPayMethod.value = method;
       };
 
+      // 3. 确认结账 (清空与完成)
       const confirmCheckout = async () => {
         try {
           const tableNo = selectedTable.value;
           const items = getTableItems(tableNo);
           const total = currentTableTotal.value;
 
-          const checkNo = `CHK-${tableNo}-${Date.now().toString().slice(-4)}`;
+          const activeOrders = allOrders.value.filter(o => o.table_no === tableNo);
+          const checkNo = activeOrders[0]?.check_no || generate6DigitCheckNo();
 
-          // A. 发送结账发票打印任务
-          const { error: printErr } = await supabaseClient.from('print_jobs').insert({
+          // A. 发送正式发票打印
+          await supabaseClient.from('print_jobs').insert({
             job_type: 'RECEIPT',
             table_no: tableNo,
             content: { 
@@ -361,10 +307,8 @@
             }
           });
 
-          if (printErr) throw printErr;
-
-          // B. 更新订单状态为 Paid (解决金额不清零核心)
-          const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
+          // B. 将所有已结账订单标记为 Paid
+          const orderIds = activeOrders.map(o => o.id);
           if (orderIds.length > 0) {
             await supabaseClient.from('orders').update({ 
               status: 'Paid',
@@ -372,108 +316,42 @@
             }).in('id', orderIds);
           }
 
-          // C. 更新桌子状态为 Empty
+          // C. 清空桌台状态
           await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
 
           showPaymentModal.value = false;
-          // D. 强制重新拉取数据刷新界面
           await fetchData();
-          alert(`Table ${tableNo} checkout complete! Receipt sent.`);
+          alert(`Table ${tableNo} Checkout Complete!`);
         } catch (err) {
           alert("Checkout failed: " + err.message);
         }
       };
 
-      // 3. Delete Item & Cancel Order
-      const removeItemFromOrder = async (order, index) => {
-        if (!confirm("Are you sure you want to remove this item?")) return;
-        
-        const updatedItems = [...order.items];
-        updatedItems.splice(index, 1);
-
-        if (updatedItems.length === 0) {
-          await cancelWholeOrder(order.id);
-          return;
-        }
-
-        const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price || 0) * item.qty), 0);
-
-        try {
-          const { error } = await supabaseClient.from('orders').update({
-            items: updatedItems,
-            total_amount: newTotal
-          }).eq('id', order.id);
-
-          if (error) throw error;
-
-          await fetchData();
-        } catch (err) {
-          alert("Failed to remove item: " + err.message);
-        }
-      };
-
-      const cancelWholeOrder = async (orderId) => {
-        if (!confirm("Are you sure you want to cancel this entire order?")) return;
-        await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', orderId);
-        fetchData();
-      };
-
-      // 4. Move Table
-      const openChangeTableModal = (tableNo) => {
-        sourceTable.value = tableNo;
-        targetTable.value = '';
-        showChangeTableModal.value = true;
-      };
-
-      const confirmChangeTable = async () => {
-        if (!targetTable.value) return alert("Please select a target table!");
-
-        try {
-          const orderIds = allOrders.value.filter(o => o.table_no === sourceTable.value).map(o => o.id);
-
-          if (orderIds.length > 0) {
-            await supabaseClient.from('orders').update({ table_no: targetTable.value }).in('id', orderIds);
-          }
-
-          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', sourceTable.value);
-          await supabaseClient.from('tables').update({ status: 'Occupied' }).eq('table_no', targetTable.value);
-
-          showChangeTableModal.value = false;
-          fetchData();
-          alert(`Successfully moved Table ${sourceTable.value} to Table ${targetTable.value}!`);
-        } catch (err) {
-          alert("Move table failed: " + err.message);
-        }
-      };
-
-      // 5. 修复点2：补全 Reprint 补打水吧与厨房单逻辑
+      // 4. Reprint 补打
       const printSplitReceipts = async (order) => {
         try {
-          const checkNo = `CHK-${order.table_no}-${Date.now().toString().slice(-4)}`;
+          const checkNo = order.check_no || generate6DigitCheckNo();
           const orderData = {
             table_no: order.table_no,
             check_no: checkNo,
-            items: order.items || [],
-            order_type: order.order_type || 'Dine-In'
+            items: order.items || []
           };
 
-          // 向 print_jobs 写入水吧补打任务
           await supabaseClient.from('print_jobs').insert({
             job_type: 'REPRINT_BAR',
             table_no: order.table_no,
             content: orderData
           });
 
-          // 向 print_jobs 写入厨房补打任务
           await supabaseClient.from('print_jobs').insert({
             job_type: 'REPRINT_KITCHEN',
             table_no: order.table_no,
             content: orderData
           });
 
-          alert(`Reprint request for Table ${order.table_no} sent to Bar & Kitchen printers!`);
+          alert(`Reprint request sent for Table ${order.table_no}!`);
         } catch (err) {
-          alert("Failed to send reprint jobs: " + err.message);
+          alert("Reprint failed: " + err.message);
         }
       };
 
@@ -482,9 +360,27 @@
         fetchData();
       };
 
+      const removeItemFromOrder = async (order, index) => {
+        if (!confirm("Remove item?")) return;
+        const updatedItems = [...order.items];
+        updatedItems.splice(index, 1);
+        if (updatedItems.length === 0) {
+          await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', order.id);
+        } else {
+          const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price || 0) * item.qty), 0);
+          await supabaseClient.from('orders').update({ items: updatedItems, total_amount: newTotal }).eq('id', order.id);
+        }
+        fetchData();
+      };
+
+      const cancelWholeOrder = async (orderId) => {
+        if (!confirm("Cancel order?")) return;
+        await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', orderId);
+        fetchData();
+      };
+
       onMounted(() => {
         fetchData();
-        subscribeRealtime();
       });
 
       return {
@@ -497,10 +393,6 @@
         cashReceived,
         currentTableTotal,
         cashChange,
-        showChangeTableModal,
-        sourceTable,
-        targetTable,
-        availableTables,
         formatTime,
         enableAudio,
         fetchData,
@@ -509,12 +401,10 @@
         openCheckoutModal,
         selectPayMethod,
         confirmCheckout,
-        removeItemFromOrder,
-        cancelWholeOrder,
-        openChangeTableModal,
-        confirmChangeTable,
         printSplitReceipts,
-        markAsServed
+        markAsServed,
+        removeItemFromOrder,
+        cancelWholeOrder
       };
     }
   }).mount('#app');
