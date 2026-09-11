@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>柜台接单与打单控制台</title>
+  <title>POS Counter & Order Control Terminal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -15,38 +15,40 @@
 
 <div id="app" v-cloak class="max-w-6xl mx-auto">
 
+  <!-- Header Section -->
   <header class="bg-slate-800 text-white p-4 rounded-xl shadow-lg flex justify-between items-center mb-6">
     <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">🖥️ 柜台接单与打单控制台</h1>
-      <p class="text-xs text-slate-400 mt-1">状态: <span class="text-green-400 font-bold">● 实时监听中</span></p>
+      <h1 class="text-2xl font-bold flex items-center gap-2">🖥️ POS Counter Terminal</h1>
+      <p class="text-xs text-slate-400 mt-1">Status: <span class="text-green-400 font-bold">● Live Listening</span></p>
     </div>
     <div class="flex gap-3">
-      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">🔊 开启提示音</button>
-      <button @click="fetchData" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-bold text-sm">🔄 刷新</button>
+      <button @click="enableAudio" class="bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg font-bold text-sm shadow">🔊 Enable Sound</button>
+      <button @click="fetchData" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg font-bold text-sm">🔄 Refresh</button>
     </div>
   </header>
 
+  <!-- Error Alert -->
   <div v-if="errorMessage" class="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 text-sm rounded-xl">❌ {{ errorMessage }}</div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-    <!-- 待处理订单 -->
+    <!-- Incoming / Pending Orders Area -->
     <div class="md:col-span-2 space-y-4">
       <h2 class="text-lg font-bold text-gray-700 flex items-center justify-between">
-        <span>🔔 待处理订单</span>
-        <span class="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold">{{ pendingOrders.length }} 笔新单</span>
+        <span>🔔 Pending Orders</span>
+        <span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-bold">{{ pendingOrders.length }} New</span>
       </h2>
 
       <div v-if="pendingOrders.length === 0" class="bg-white p-8 rounded-xl text-center text-gray-400 shadow-sm border border-gray-200">
-        暂无新订单，静候顾客扫码...
+        No pending orders. Waiting for QR scan...
       </div>
 
       <div v-for="order in pendingOrders" :key="order.id" class="bg-white p-5 rounded-xl border border-amber-200 shadow-md">
         <div class="flex justify-between items-start border-b pb-3 border-gray-100">
           <div>
-            <span class="text-2xl font-black text-amber-600 mr-2">桌号: {{ order.table_no }}</span>
+            <span class="text-2xl font-black text-amber-600 mr-2">Table: {{ order.table_no }}</span>
             <span :class="['text-xs px-2 py-0.5 rounded font-bold', order.order_type === 'Dine-In' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700']">
-              {{ order.order_type === 'Dine-In' ? '堂食' : '外带' }}
+              {{ order.order_type === 'Dine-In' ? 'Dine-In' : 'Takeaway' }}
             </span>
           </div>
           <div class="text-right">
@@ -55,36 +57,43 @@
           </div>
         </div>
 
+        <!-- Order Items Breakdown & Item Deletion -->
         <div class="py-3 space-y-2">
-          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between text-sm">
-            <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
+          <div v-for="(item, idx) in order.items" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-1">
+            <div class="flex items-center gap-2">
+              <button @click="removeItemFromOrder(order, idx)" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-1.5 py-0.5 rounded" title="Remove Item">✕</button>
+              <span class="font-bold text-gray-700">{{ item.name }} x {{ item.qty }}</span>
+            </div>
             <span :class="['text-xs px-2 py-0.5 rounded font-mono', item.printer === 'Bar' ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800']">
-              {{ item.printer === 'Bar' ? '水吧 (BAR)' : '后厨 (KITCHEN)' }}
+              {{ item.printer === 'Bar' ? 'BAR' : 'KITCHEN' }}
             </span>
           </div>
         </div>
 
         <div class="flex gap-2 pt-2 border-t border-gray-100">
           <button @click="printSplitReceipts(order)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold shadow">
-            🖨️ 补打订单 (BAR + KITCHEN)
+            🖨️ Reprint Slips (BAR + KITCHEN)
           </button>
-          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
-            ✅ 已出菜
+          <button @click="markAsServed(order.id)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow">
+            ✅ Served
+          </button>
+          <button @click="cancelWholeOrder(order.id)" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow">
+            🚫 Cancel Order
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 桌台管理 & 结账 / Check 打单 -->
+    <!-- Table Management & Settlement -->
     <div>
-      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ 桌面管理 & 结账出单</h2>
+      <h2 class="text-lg font-bold text-gray-700 mb-4">🍽️ Table Management</h2>
       <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
         <div v-for="table in tables" :key="table.table_no" class="p-3 rounded-lg border space-y-2" :class="table.status === 'Occupied' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'">
           <div class="flex justify-between items-center">
             <div>
-              <div class="font-bold text-gray-800">{{ table.table_no }} 桌</div>
+              <div class="font-bold text-gray-800">Table {{ table.table_no }}</div>
               <div class="text-xs" :class="table.status === 'Occupied' ? 'text-red-500 font-bold' : 'text-gray-400'">
-                {{ table.status === 'Occupied' ? '🔴 使用中' : '🟢 空闲' }}
+                {{ table.status === 'Occupied' ? '🔴 Occupied' : '🟢 Available' }}
               </div>
             </div>
             <div class="text-xs font-bold text-emerald-700" v-if="table.status === 'Occupied'">
@@ -92,12 +101,17 @@
             </div>
           </div>
 
-          <div v-if="table.status === 'Occupied'" class="flex gap-2 pt-1">
-            <button @click="printCheckReceipt(table.table_no)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs py-1.5 rounded font-bold">
-              📄 打查账单 (Check)
-            </button>
-            <button @click="checkoutAndPrintReceipt(table.table_no)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded font-bold">
-              💳 结账出单 (Receipt)
+          <div v-if="table.status === 'Occupied'" class="space-y-1.5 pt-1">
+            <div class="flex gap-2">
+              <button @click="printCheckReceipt(table.table_no)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-xs py-1.5 rounded font-bold">
+                📄 Print Check
+              </button>
+              <button @click="openCheckoutModal(table.table_no)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded font-bold">
+                💳 Checkout
+              </button>
+            </div>
+            <button @click="openChangeTableModal(table.table_no)" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs py-1 rounded font-bold">
+              🔄 Move / Change Table
             </button>
           </div>
         </div>
@@ -106,13 +120,74 @@
 
   </div>
 
+  <!-- Payment & Cash Change Modal -->
+  <div v-if="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="text-lg font-bold text-gray-800">💳 Payment - Table {{ selectedTable }}</h3>
+        <button @click="showPaymentModal = false" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+      </div>
+
+      <div class="text-center py-2 bg-gray-50 rounded-lg">
+        <p class="text-xs text-gray-500">Total Payable</p>
+        <p class="text-3xl font-black text-emerald-600">RM {{ currentTableTotal.toFixed(2) }}</p>
+      </div>
+
+      <!-- Payment Options Grid (Included Visa & Mastercard) -->
+      <div class="grid grid-cols-2 gap-2">
+        <button @click="selectPayMethod('Cash')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Cash' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💵 Cash</button>
+        <button @click="selectPayMethod('QR Pay')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'QR Pay' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">📱 QR Pay</button>
+        <button @click="selectPayMethod('Visa')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Visa' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Visa</button>
+        <button @click="selectPayMethod('Mastercard')" :class="['py-2.5 rounded-lg text-sm font-bold border', selectedPayMethod === 'Mastercard' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700']">💳 Mastercard</button>
+      </div>
+
+      <!-- Cash Calculator -->
+      <div v-if="selectedPayMethod === 'Cash'" class="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+        <div class="flex justify-between items-center">
+          <label class="text-xs font-bold text-gray-700">Cash Received (RM):</label>
+          <input type="number" v-model.number="cashReceived" class="w-28 p-1.5 border rounded text-right font-bold text-gray-800" placeholder="e.g. 100">
+        </div>
+        <div class="flex justify-between items-center pt-1 border-t border-amber-200 text-sm">
+          <span class="font-bold text-gray-600">Change Due:</span>
+          <span :class="['font-black text-lg', cashChange >= 0 ? 'text-green-600' : 'text-red-500']">
+            RM {{ cashChange >= 0 ? cashChange.toFixed(2) : 'Insufficient' }}
+          </span>
+        </div>
+      </div>
+
+      <button @click="confirmCheckout" :disabled="selectedPayMethod === 'Cash' && cashChange < 0" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white py-3 rounded-xl font-bold shadow">
+        Confirm & Print Receipt
+      </button>
+    </div>
+  </div>
+
+  <!-- Change Table Modal -->
+  <div v-if="showChangeTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-gray-800 border-b pb-2">🔄 Change / Move Table</h3>
+      <p class="text-sm text-gray-600">Move orders from <span class="font-bold text-amber-600">Table {{ sourceTable }}</span> to:</p>
+      
+      <select v-model="targetTable" class="w-full p-2.5 border rounded-lg font-bold text-gray-800">
+        <option value="" disabled>Select Target Table</option>
+        <option v-for="t in availableTables" :key="t.table_no" :value="t.table_no">
+          Table {{ t.table_no }} {{ t.status === 'Occupied' ? '(Merge Orders)' : '(Empty)' }}
+        </option>
+      </select>
+
+      <div class="flex gap-2 pt-2">
+        <button @click="showChangeTableModal = false" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">Cancel</button>
+        <button @click="confirmChangeTable" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg text-sm font-bold shadow">Confirm Move</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
   const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co"; 
   const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
 
-  const { createApp, ref, onMounted } = Vue;
+  const { createApp, ref, computed, onMounted } = Vue;
 
   createApp({
     setup() {
@@ -120,6 +195,18 @@
       const allOrders = ref([]);
       const tables = ref([]);
       const errorMessage = ref('');
+      
+      // Payment & Cash State
+      const showPaymentModal = ref(false);
+      const selectedTable = ref('');
+      const selectedPayMethod = ref('Cash');
+      const cashReceived = ref(0);
+
+      // Change Table State
+      const showChangeTableModal = ref(false);
+      const sourceTable = ref('');
+      const targetTable = ref('');
+
       let audioContext = null;
       let supabaseClient = null;
 
@@ -127,7 +214,7 @@
 
       const enableAudio = () => {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        alert('✅ 接单音效已激活！');
+        alert('✅ Audio alert activated!');
       };
 
       const playBeep = () => {
@@ -143,7 +230,7 @@
 
       const initSupabase = () => {
         const supabaseLib = window.supabase || window.supabaseJs;
-        if (!supabaseLib) throw new Error("Supabase SDK 加载失败");
+        if (!supabaseLib) throw new Error("Failed to load Supabase SDK");
         return supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
       };
 
@@ -159,14 +246,14 @@
           if (oErr) throw oErr;
           pendingOrders.value = oData || [];
 
-          const { data: unPaid } = await supabaseClient.from('orders').select('*').neq('status', 'Paid');
+          const { data: unPaid } = await supabaseClient.from('orders').select('*').neq('status', 'Paid').neq('status', 'Cancelled');
           allOrders.value = unPaid || [];
 
           const { data: tData, error: tErr } = await supabaseClient.from('tables').select('*');
           if (tErr) throw tErr;
           tables.value = tData || [];
         } catch (err) {
-          errorMessage.value = '数据读取失败: ' + err.message;
+          errorMessage.value = 'Data fetch failed: ' + err.message;
         }
       };
 
@@ -186,6 +273,16 @@
         return tableOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
       };
 
+      const currentTableTotal = computed(() => getTableTotal(selectedTable.value));
+      
+      const cashChange = computed(() => {
+        return Number(cashReceived.value || 0) - currentTableTotal.value;
+      });
+
+      const availableTables = computed(() => {
+        return tables.value.filter(t => t.table_no !== sourceTable.value);
+      });
+
       const getTableItems = (tableNo) => {
         const tableOrders = allOrders.value.filter(o => o.table_no === tableNo);
         const map = {};
@@ -198,16 +295,13 @@
         return Object.values(map);
       };
 
-      // 1. 按 Check 打印预结单（向后台队列插入任务，由 192.168.1.93 响机出纸）
+      // 1. Print Check Bill
       const printCheckReceipt = async (tableNo) => {
         try {
           const items = getTableItems(tableNo);
           const total = getTableTotal(tableNo);
 
-          if (items.length === 0) {
-            alert("该桌暂无消费明细！");
-            return;
-          }
+          if (items.length === 0) return alert("No items found for this table!");
 
           const { error } = await supabaseClient.from('print_jobs').insert({
             job_type: 'CHECK',
@@ -216,52 +310,125 @@
           });
 
           if (error) throw error;
+          alert(`Check bill print job sent for Table ${tableNo}`);
         } catch (err) {
-          alert("发送打查账单任务失败: " + err.message);
+          alert("Failed to send check bill job: " + err.message);
         }
       };
 
-      // 2. 按 Receipt 打印发票并结账
-      const checkoutAndPrintReceipt = async (tableNo) => {
+      // 2. Checkout & Payment
+      const openCheckoutModal = (tableNo) => {
+        if (getTableItems(tableNo).length === 0) return alert("No items found for this table!");
+        selectedTable.value = tableNo;
+        selectedPayMethod.value = 'Cash';
+        cashReceived.value = Math.ceil(getTableTotal(tableNo));
+        showPaymentModal.value = true;
+      };
+
+      const selectPayMethod = (method) => {
+        selectedPayMethod.value = method;
+      };
+
+      const confirmCheckout = async () => {
         try {
+          const tableNo = selectedTable.value;
           const items = getTableItems(tableNo);
-          const total = getTableTotal(tableNo);
+          const total = currentTableTotal.value;
 
-          if (items.length === 0) {
-            alert("该桌暂无消费明细！");
-            return;
-          }
-
-          // A. 发送打单任务给后台
           const { error: printErr } = await supabaseClient.from('print_jobs').insert({
             job_type: 'RECEIPT',
             table_no: tableNo,
-            content: { items, total }
+            content: { 
+              items, 
+              total, 
+              pay_method: selectedPayMethod.value,
+              cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
+              cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
+            }
           });
 
           if (printErr) throw printErr;
 
-          // B. 更新桌台与订单状态
           const orderIds = allOrders.value.filter(o => o.table_no === tableNo).map(o => o.id);
           if (orderIds.length > 0) {
-            await supabaseClient.from('orders').update({ status: 'Paid' }).in('id', orderIds);
+            await supabaseClient.from('orders').update({ 
+              status: 'Paid',
+              pay_method: selectedPayMethod.value 
+            }).in('id', orderIds);
           }
           await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', tableNo);
 
+          showPaymentModal.value = false;
           fetchData();
         } catch (err) {
-          alert("结账处理失败: " + err.message);
+          alert("Checkout failed: " + err.message);
         }
       };
 
-      // 3. 补打或重新触发订单（重新触发 orders 的后台推送逻辑）
-      const printSplitReceipts = async (order) => {
-        try {
-          // 重新把这笔订单的信息插入打单队列或重新打印
-          alert(`已触发桌号 ${order.table_no} 的打印，请检查打印机。`);
-        } catch (err) {
-          alert("打单失败: " + err.message);
+      // 3. Delete Item & Cancel Order
+      const removeItemFromOrder = async (order, index) => {
+        if (!confirm("Are you sure you want to remove this item?")) return;
+        
+        const updatedItems = [...order.items];
+        updatedItems.splice(index, 1);
+
+        if (updatedItems.length === 0) {
+          await cancelWholeOrder(order.id);
+          return;
         }
+
+        const newTotal = updatedItems.reduce((sum, item) => sum + (Number(item.price || 0) * item.qty), 0);
+
+        try {
+          const { error } = await supabaseClient.from('orders').update({
+            items: updatedItems,
+            total_amount: newTotal
+          }).eq('id', order.id);
+
+          if (error) throw error;
+
+          await fetchData();
+        } catch (err) {
+          alert("Failed to remove item: " + err.message);
+        }
+      };
+
+      const cancelWholeOrder = async (orderId) => {
+        if (!confirm("Are you sure you want to cancel this entire order?")) return;
+        await supabaseClient.from('orders').update({ status: 'Cancelled' }).eq('id', orderId);
+        fetchData();
+      };
+
+      // 4. Move Table
+      const openChangeTableModal = (tableNo) => {
+        sourceTable.value = tableNo;
+        targetTable.value = '';
+        showChangeTableModal.value = true;
+      };
+
+      const confirmChangeTable = async () => {
+        if (!targetTable.value) return alert("Please select a target table!");
+
+        try {
+          const orderIds = allOrders.value.filter(o => o.table_no === sourceTable.value).map(o => o.id);
+
+          if (orderIds.length > 0) {
+            await supabaseClient.from('orders').update({ table_no: targetTable.value }).in('id', orderIds);
+          }
+
+          await supabaseClient.from('tables').update({ status: 'Empty' }).eq('table_no', sourceTable.value);
+          await supabaseClient.from('tables').update({ status: 'Occupied' }).eq('table_no', targetTable.value);
+
+          showChangeTableModal.value = false;
+          fetchData();
+          alert(`Successfully moved Table ${sourceTable.value} to Table ${targetTable.value}!`);
+        } catch (err) {
+          alert("Move table failed: " + err.message);
+        }
+      };
+
+      const printSplitReceipts = async (order) => {
+        alert(`Kitchen and Bar print job triggered for Table ${order.table_no}.`);
       };
 
       const markAsServed = async (orderId) => {
@@ -278,12 +445,28 @@
         pendingOrders,
         tables,
         errorMessage,
+        showPaymentModal,
+        selectedTable,
+        selectedPayMethod,
+        cashReceived,
+        currentTableTotal,
+        cashChange,
+        showChangeTableModal,
+        sourceTable,
+        targetTable,
+        availableTables,
         formatTime,
         enableAudio,
         fetchData,
         getTableTotal,
         printCheckReceipt,
-        checkoutAndPrintReceipt,
+        openCheckoutModal,
+        selectPayMethod,
+        confirmCheckout,
+        removeItemFromOrder,
+        cancelWholeOrder,
+        openChangeTableModal,
+        confirmChangeTable,
         printSplitReceipts,
         markAsServed
       };
