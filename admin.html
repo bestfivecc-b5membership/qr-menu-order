@@ -11,20 +11,15 @@
   <style>
     .circle-table { border-radius: 50% !important; }
     .resize-handle {
-      position: absolute;
-      right: 0px;
-      bottom: 0px;
-      width: 18px;
-      height: 18px;
-      cursor: se-resize;
-      background: #f59e0b;
-      border-radius: 4px;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 10px;
+      position: absolute; right: 0px; bottom: 0px; width: 18px; height: 18px;
+      cursor: se-resize; background: #f59e0b; border-radius: 4px; z-index: 30;
+      display: flex; align-items: center; justify-content: center; color: white; font-size: 10px;
+    }
+    /* 打印报表时的专用样式 */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-report, #printable-report * { visibility: visible; }
+      #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
     }
   </style>
 </head>
@@ -60,7 +55,7 @@
         <button 
           @click="switchToReports" 
           :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-chart-line"></i> View Reports
+          <i class="fas fa-chart-line"></i> View Reports & Invoices
         </button>
       </div>
 
@@ -73,15 +68,12 @@
 
     <!-- TAB 1: FLOOR LAYOUT VIEW -->
     <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- Left 2 Cols: Table Floor Plan Canvas -->
       <div class="lg:col-span-2 space-y-4">
         <div class="bg-white p-5 rounded-xl shadow-sm">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
               <i class="fas fa-th text-amber-500"></i> Floor Layout
             </h2>
-
             <div class="flex items-center gap-2">
               <button 
                 @click="isEditLayout = !isEditLayout" 
@@ -95,7 +87,6 @@
             </div>
           </div>
 
-          <!-- Canvas Area -->
           <div 
             class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden" 
             style="height: 520px;" 
@@ -120,33 +111,22 @@
               <template v-if="!isEditLayout">
                 <div class="flex justify-between items-start w-full" :class="table.shape === 'circle' ? 'flex-col items-center gap-1' : ''">
                   <span class="font-bold text-sm text-gray-800">T-{{ table.table_no }}</span>
-                  <span :class="[
-                    'px-1.5 py-0.5 text-[9px] font-semibold rounded-full',
-                    getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                  ]">
+                  <span :class="['px-1.5 py-0.5 text-[9px] font-semibold rounded-full', getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800']">
                     {{ getTableStatus(table.table_no) }}
                   </span>
                 </div>
-
                 <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-1">
                   <p class="text-xs font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
                 </div>
-                <div v-else class="text-[10px] text-gray-400">
-                  Ready
-                </div>
+                <div v-else class="text-[10px] text-gray-400">Ready</div>
               </template>
-
               <template v-else>
-                <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">
-                  T-{{ table.table_no }}
-                </div>
-
+                <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">T-{{ table.table_no }}</div>
                 <div class="flex justify-center gap-1 z-10 my-1">
                   <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">S</button>
                   <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">R</button>
                   <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">C</button>
                 </div>
-
                 <div class="resize-handle" @mousedown.stop.prevent="startResize(table, $event)">
                   <i class="fas fa-compress-alt text-[8px]"></i>
                 </div>
@@ -156,7 +136,7 @@
         </div>
       </div>
 
-      <!-- Right Col: Selected Table Detail / Order Actions -->
+      <!-- Right Col: Selected Table Detail -->
       <div class="space-y-6">
         <div class="bg-white p-5 rounded-xl shadow-sm sticky top-6">
           <div v-if="selectedTable" class="space-y-4">
@@ -186,147 +166,118 @@
                     <p class="font-bold text-gray-800">{{ item.name }}</p>
                     <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
                   </div>
-                  
                   <span class="font-bold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
                 </div>
-
                 <div class="flex justify-between items-center pt-1 border-t border-gray-100 text-xs">
-                  <span :class="[
-                    'px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1',
-                    item.status === 'Served' ? 'bg-green-100 text-green-700' :
-                    item.status === 'Cooking' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800'
-                  ]">
-                    <i :class="[
-                      'fas text-[8px]',
-                      item.status === 'Served' ? 'fa-check-circle' :
-                      item.status === 'Cooking' ? 'fa-fire' : 'fa-clock'
-                    ]"></i>
+                  <span :class="['px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1', item.status === 'Served' ? 'bg-green-100 text-green-700' : item.status === 'Cooking' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800']">
                     {{ item.status || 'Pending' }}
                   </span>
-
                   <div v-if="isEditingItems" class="flex items-center gap-1.5">
-                    <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center transition">
-                      <i class="fas fa-trash-alt text-xs"></i>
-                    </button>
+                    <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 text-red-600 rounded"><i class="fas fa-trash-alt text-xs"></i></button>
                     <template v-else>
-                      <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded flex items-center justify-center">-</button>
+                      <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 text-amber-800 font-bold rounded">-</button>
                       <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
-                      <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 hover:bg-green-200 text-green-700 font-bold rounded flex items-center justify-center">+</button>
+                      <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 text-green-700 font-bold rounded">+</button>
                     </template>
                   </div>
-                  <div v-else class="text-xs text-gray-500 font-semibold">
-                    Qty: x{{ item.qty }}
-                  </div>
+                  <div v-else class="text-xs text-gray-500 font-semibold">Qty: x{{ item.qty }}</div>
                 </div>
               </div>
-
-              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">
-                No active order items on this table.
-              </div>
+              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">No active order items on this table.</div>
             </div>
 
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
-              <button 
-                @click="isEditingItems = !isEditingItems" 
-                :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100']">
-                <i class="fas" :class="isEditingItems ? 'fa-check' : 'fa-edit'"></i>
+              <button @click="isEditingItems = !isEditingItems" :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-amber-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100']">
                 {{ isEditingItems ? 'Done Editing Items' : 'Manage / Delete Items' }}
               </button>
             </div>
 
             <div v-if="getTableItems(selectedTable).length > 0" class="border-t pt-3 space-y-1.5 text-sm">
-              <div class="flex justify-between text-gray-500">
-                <span>Subtotal</span>
-                <span>RM {{ getTableSubtotal(selectedTable).toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between text-gray-500">
-                <span>Service Charge (10%)</span>
-                <span>RM {{ (getTableSubtotal(selectedTable) * 0.10).toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between text-lg font-bold text-gray-900 border-t pt-2">
-                <span>Total Due</span>
-                <span class="text-amber-600">RM {{ getTableTotal(selectedTable).toFixed(2) }}</span>
-              </div>
+              <div class="flex justify-between text-gray-500"><span>Subtotal</span><span>RM {{ getTableSubtotal(selectedTable).toFixed(2) }}</span></div>
+              <div class="flex justify-between text-gray-500"><span>Service Charge (10%)</span><span>RM {{ (getTableSubtotal(selectedTable) * 0.10).toFixed(2) }}</span></div>
+              <div class="flex justify-between text-lg font-bold text-gray-900 border-t pt-2"><span>Total Due</span><span class="text-amber-600">RM {{ getTableTotal(selectedTable).toFixed(2) }}</span></div>
             </div>
 
             <div v-if="getTableItems(selectedTable).length > 0" class="space-y-2 pt-2">
               <div class="grid grid-cols-2 gap-3">
-                <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
-                  <i class="fas fa-print"></i> Print Check
-                </button>
-                <button @click="openPaymentModal(selectedTable)" class="py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
-                  <i class="fas fa-cash-register"></i> Checkout
-                </button>
+                <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm flex items-center justify-center gap-2"><i class="fas fa-print"></i> Print Check</button>
+                <button @click="openPaymentModal(selectedTable)" class="py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm flex items-center justify-center gap-2"><i class="fas fa-cash-register"></i> Checkout</button>
               </div>
-              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1 border border-red-200">
-                <i class="fas fa-ban"></i> Void Entire Order
-              </button>
+              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 text-red-600 font-semibold rounded-lg text-xs flex items-center justify-center gap-1 border border-red-200"><i class="fas fa-ban"></i> Void Entire Order</button>
             </div>
           </div>
-
-          <div v-else class="text-center py-12 text-gray-400">
-            <i class="fas fa-mouse-pointer text-3xl mb-2 text-gray-300"></i>
-            <p>Select a table to view active orders or manage billing.</p>
-          </div>
+          <div v-else class="text-center py-12 text-gray-400"><i class="fas fa-mouse-pointer text-3xl mb-2 text-gray-300"></i><p>Select a table to manage order.</p></div>
         </div>
       </div>
     </div>
 
-    <!-- TAB 2: SOLD OUT MANAGEMENT VIEW -->
+    <!-- TAB 2: MENU SOLD OUT -->
     <div v-if="activeTab === 'menu'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
-        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management
-        </h2>
-        <span class="text-xs text-gray-500">Changes reflect instantly on customer phones.</span>
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management</h2>
       </div>
-
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div v-for="item in menuList" :key="item.id" class="p-3 border rounded-xl flex justify-between items-center bg-gray-50">
-          <div>
-            <p class="font-bold text-gray-800 text-sm">{{ item.name }}</p>
-            <p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p>
-          </div>
-
-          <button 
-            @click="toggleSoldOut(item)"
-            :class="[
-              'px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1',
-              item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'
-            ]"
-          >
-            <i :class="item.is_sold_out ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+          <div><p class="font-bold text-gray-800 text-sm">{{ item.name }}</p><p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p></div>
+          <button @click="toggleSoldOut(item)" :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition', item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800']">
             {{ item.is_sold_out ? 'Sold Out' : 'Available' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- TAB 3: ALL-IN-ONE REPORTS & ANALYTICS VIEW -->
+    <!-- TAB 3: FLEXIBLE REPORTS & REPRINT INVOICES VIEW -->
     <div v-if="activeTab === 'reports'" class="space-y-6">
       
-      <!-- Date Filter Bar -->
-      <div class="bg-white p-4 rounded-xl shadow-sm flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-chart-pie text-amber-500"></i> Business Analytics & Sales Reports
-          </h2>
-          <p class="text-xs text-gray-500">Real-time revenue metrics & performance insight</p>
+      <!-- Top Filter & Action Header -->
+      <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+        <div class="flex flex-wrap justify-between items-center gap-4 border-b pb-3">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <i class="fas fa-chart-line text-amber-500"></i> Business Analytics & Sales Reports
+            </h2>
+            <p class="text-xs text-gray-500">Filter by any day, month, year, or custom date range. Reprint receipts anytime.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button @click="printCurrentReport" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
+              <i class="fas fa-print"></i> Print Sales Summary Report
+            </button>
+          </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button 
-            v-for="period in ['today', 'yesterday', 'week', 'month']" 
-            :key="period"
-            @click="reportPeriod = period; fetchReportData()"
-            :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition capitalize', reportPeriod === period ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']"
-          >
-            {{ period }}
-          </button>
+        <!-- Date Range Selection Controls -->
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <!-- Preset Buttons -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button 
+              v-for="p in [
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: 'week', label: 'This Week' },
+                { id: 'month', label: 'This Month' },
+                { id: 'year', label: 'This Year (Annual)' },
+                { id: 'all', label: 'All Time' }
+              ]" 
+              :key="p.id"
+              @click="setReportPreset(p.id)"
+              :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition', reportPreset === p.id ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']"
+            >
+              {{ p.label }}
+            </button>
+          </div>
+
+          <!-- Custom Date Input -->
+          <div class="flex items-center gap-2 text-xs bg-gray-50 p-1.5 rounded-lg border">
+            <span class="font-semibold text-gray-500">Custom Range:</span>
+            <input type="date" v-model="startDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-2 py-1 outline-none font-semibold text-gray-700" />
+            <span class="text-gray-400">to</span>
+            <input type="date" v-model="endDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-2 py-1 outline-none font-semibold text-gray-700" />
+          </div>
         </div>
       </div>
 
-      <!-- Key Financial Metrics KPI Cards -->
+      <!-- KPI Summary Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
           <div class="flex justify-between items-center text-gray-500 mb-1">
@@ -334,7 +285,7 @@
             <i class="fas fa-dollar-sign text-green-500"></i>
           </div>
           <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">Completed Paid Orders</span>
+          <span class="text-[10px] text-gray-400">Net Paid Receipts</span>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
@@ -343,38 +294,37 @@
             <i class="fas fa-receipt text-blue-500"></i>
           </div>
           <p class="text-2xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
-          <span class="text-[10px] text-gray-400">Tables Served</span>
+          <span class="text-[10px] text-gray-400">Completed Transactions</span>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
           <div class="flex justify-between items-center text-gray-500 mb-1">
-            <span class="text-xs font-semibold uppercase">Avg Transaction (ATV)</span>
+            <span class="text-xs font-semibold uppercase">Avg Ticket Size (ATV)</span>
             <i class="fas fa-calculator text-purple-500"></i>
           </div>
           <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.avgTicket.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">Per Table Spend</span>
+          <span class="text-[10px] text-gray-400">Average Spend per Check</span>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
           <div class="flex justify-between items-center text-gray-500 mb-1">
-            <span class="text-xs font-semibold uppercase">Voided / Cancelled</span>
+            <span class="text-xs font-semibold uppercase">Voided Total</span>
             <i class="fas fa-ban text-red-500"></i>
           </div>
           <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Voided Tickets</span>
+          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Cancelled Orders</span>
         </div>
       </div>
 
-      <!-- Charts & Breakdowns Row -->
+      <!-- Charts & Payment Methods Row -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Payment Methods Breakdown -->
+        <!-- Payment Breakdown -->
         <div class="bg-white p-5 rounded-xl shadow-sm space-y-3">
           <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
-            <span>Payment Breakdown</span>
+            <span>Payment Method Breakdown</span>
             <i class="fas fa-wallet text-gray-400"></i>
           </h3>
-          <div class="space-y-2">
+          <div class="space-y-3">
             <div v-for="(amount, method) in reportStats.payMethods" :key="method" class="space-y-1">
               <div class="flex justify-between text-xs font-semibold">
                 <span class="text-gray-700">{{ method }}</span>
@@ -385,19 +335,18 @@
               </div>
             </div>
             <div v-if="Object.keys(reportStats.payMethods).length === 0" class="text-center py-6 text-xs text-gray-400">
-              No sales data recorded yet.
+              No payment data recorded in selected range.
             </div>
           </div>
         </div>
 
-        <!-- Hourly Peak Sales Trend -->
+        <!-- Sales Peak Trend -->
         <div class="bg-white p-5 rounded-xl shadow-sm space-y-3 lg:col-span-2">
           <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
-            <span>Hourly Sales Peak Trend</span>
+            <span>Time Peak Sales Distribution</span>
             <i class="fas fa-chart-bar text-gray-400"></i>
           </h3>
-          
-          <div class="flex items-end justify-between gap-2 h-40 pt-4 px-2 border-b border-gray-100">
+          <div class="flex items-end justify-between gap-2 h-44 pt-4 px-2 border-b border-gray-100">
             <div v-for="(sales, hourStr) in reportStats.hourlySales" :key="hourStr" class="flex-1 flex flex-col items-center gap-1">
               <span class="text-[9px] font-bold text-amber-600">RM {{ sales > 0 ? sales.toFixed(0) : '' }}</span>
               <div class="w-full bg-amber-100 rounded-t hover:bg-amber-400 transition" :style="{ height: getHourlyHeight(sales) + '%' }"></div>
@@ -405,19 +354,16 @@
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- Top 5 Selling Items & Order History Log -->
+      <!-- Best Sellers & Full Invoices Master Log with Reprint -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         <!-- Top 5 Best Sellers -->
         <div class="bg-white p-5 rounded-xl shadow-sm space-y-3">
           <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
-            <span>Top 5 Best Selling Items</span>
+            <span>Top Selling Items</span>
             <i class="fas fa-fire text-amber-500"></i>
           </h3>
-
           <div class="space-y-3">
             <div v-for="(item, idx) in reportStats.topItems" :key="idx" class="flex items-center justify-between text-xs">
               <div class="flex items-center gap-2">
@@ -426,67 +372,99 @@
                 </span>
                 <div>
                   <p class="font-bold text-gray-800">{{ item.name }}</p>
-                  <p class="text-[10px] text-gray-400">Sold: {{ item.qty }} qty</p>
+                  <p class="text-[10px] text-gray-400">Qty: {{ item.qty }}</p>
                 </div>
               </div>
               <span class="font-bold text-amber-600">RM {{ item.total.toFixed(2) }}</span>
             </div>
-            <div v-if="reportStats.topItems.length === 0" class="text-center py-6 text-xs text-gray-400">
-              No items sold in this period.
-            </div>
+            <div v-if="reportStats.topItems.length === 0" class="text-center py-6 text-xs text-gray-400">No items sold in selected period.</div>
           </div>
         </div>
 
-        <!-- Paid Transactions Log -->
+        <!-- Comprehensive Transaction Master Log (With Search & Reprint) -->
         <div class="bg-white p-5 rounded-xl shadow-sm space-y-3 lg:col-span-2">
-          <div class="flex justify-between items-center border-b pb-2">
+          <div class="flex flex-wrap justify-between items-center border-b pb-2 gap-2">
             <h3 class="text-md font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-list text-gray-500"></i> Completed Transactions Log
+              <i class="fas fa-file-invoice text-gray-500"></i> Transactions & Invoice History
             </h3>
-            <input type="text" v-model="searchLog" placeholder="Search Check# / Table" class="px-2.5 py-1 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500" />
+            <div class="flex items-center gap-2">
+              <input type="text" v-model="searchLog" placeholder="Search Check# / Table / Method" class="px-3 py-1 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500 w-48" />
+            </div>
           </div>
 
-          <div class="overflow-x-auto max-h-60">
+          <div class="overflow-x-auto max-h-80">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="bg-gray-50 text-gray-500 font-semibold border-b">
                   <th class="p-2">Check #</th>
                   <th class="p-2">Table</th>
-                  <th class="p-2">Payment Method</th>
-                  <th class="p-2">Time</th>
-                  <th class="p-2 text-right">Amount</th>
+                  <th class="p-2">Status</th>
+                  <th class="p-2">Payment</th>
+                  <th class="p-2">Date & Time</th>
+                  <th class="p-2 text-right">Total</th>
+                  <th class="p-2 text-center">Action</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr v-for="log in filteredLogs" :key="log.id" class="hover:bg-gray-50/50">
                   <td class="p-2 font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</td>
                   <td class="p-2 font-semibold">T-{{ log.table_no }}</td>
+                  <td class="p-2">
+                    <span :class="['px-2 py-0.5 rounded text-[10px] font-bold', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
+                      {{ log.status }}
+                    </span>
+                  </td>
                   <td class="p-2"><span class="px-2 py-0.5 bg-gray-100 rounded font-semibold">{{ log.pay_method || 'Cash' }}</span></td>
-                  <td class="p-2 text-gray-400">{{ formatTime(log.created_at) }}</td>
+                  <td class="p-2 text-gray-400">{{ formatFullDateTime(log.created_at) }}</td>
                   <td class="p-2 font-bold text-right text-gray-800">RM {{ getLogTotal(log).toFixed(2) }}</td>
+                  <td class="p-2 text-center">
+                    <button @click="reprintInvoice(log)" class="px-2.5 py-1 bg-gray-100 hover:bg-amber-50 text-gray-700 hover:text-amber-700 rounded text-[11px] font-bold transition border flex items-center gap-1 mx-auto">
+                      <i class="fas fa-print"></i> Reprint
+                    </button>
+                  </td>
                 </tr>
                 <tr v-if="filteredLogs.length === 0">
-                  <td colspan="5" class="text-center py-6 text-gray-400">No transaction records found.</td>
+                  <td colspan="7" class="text-center py-8 text-gray-400">No matching transaction records found.</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
-
       </div>
 
+    </div>
+
+    <!-- Hidden Report Print Template (For Browser Standard Printing) -->
+    <div id="printable-report" class="hidden print:block p-8">
+      <div class="text-center border-b pb-4 mb-4">
+        <h1 class="text-2xl font-bold">B5 Cuisine - Sales Summary Report</h1>
+        <p class="text-sm">Range: {{ startDate }} to {{ endDate }}</p>
+        <p class="text-xs text-gray-500">Printed on: {{ new Date().toLocaleString() }}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div><strong>Total Revenue:</strong> RM {{ reportStats.totalRevenue.toFixed(2) }}</div>
+        <div><strong>Total Paid Orders:</strong> {{ reportStats.totalOrders }}</div>
+        <div><strong>Average Spend (ATV):</strong> RM {{ reportStats.avgTicket.toFixed(2) }}</div>
+        <div><strong>Voided Revenue:</strong> RM {{ reportStats.voidTotal.toFixed(2) }} ({{ reportStats.voidCount }} items)</div>
+      </div>
+      <h3 class="font-bold border-b mb-2">Payment Breakdown</h3>
+      <ul class="mb-6">
+        <li v-for="(amt, m) in reportStats.payMethods" :key="m">{{ m }}: RM {{ amt.toFixed(2) }}</li>
+      </ul>
+      <h3 class="font-bold border-b mb-2">Top Selling Items</h3>
+      <ul>
+        <li v-for="(item, i) in reportStats.topItems" :key="i">{{ i+1 }}. {{ item.name }} - Qty: {{ item.qty }} - RM {{ item.total.toFixed(2) }}</li>
+      </ul>
     </div>
 
     <!-- Payment Modal -->
     <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
         <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
-        
         <div class="bg-amber-50 p-3 rounded-lg flex justify-between items-center">
           <span class="text-amber-800 font-medium">Grand Total</span>
           <span class="text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
         </div>
-
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
           <div class="grid grid-cols-3 gap-2">
@@ -500,7 +478,6 @@
             </button>
           </div>
         </div>
-
         <div v-if="selectedPayMethod === 'Cash'" class="space-y-3">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Cash Received (RM)</label>
@@ -511,7 +488,6 @@
             <span :class="cashChange >= 0 ? 'text-green-600' : 'text-red-600'">RM {{ cashChange.toFixed(2) }}</span>
           </div>
         </div>
-
         <div class="flex gap-3 pt-2">
           <button @click="showPaymentModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300">Cancel</button>
           <button @click="confirmCheckout" class="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow">Complete Paid & Print</button>
@@ -525,7 +501,7 @@
         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
           <i class="fas fa-lock text-red-500"></i> Staff Authorization Required
         </h3>
-        <p class="text-xs text-gray-500">Please enter manager/staff PIN to perform this action.</p>
+        <p class="text-xs text-gray-500">Please enter manager PIN to proceed.</p>
         <div>
           <input type="password" v-model="staffPassword" placeholder="Enter PIN" class="w-full border rounded-lg p-2.5 text-center text-xl tracking-widest font-bold focus:ring-2 focus:ring-red-500 outline-none" />
         </div>
@@ -539,11 +515,8 @@
     <!-- Transfer / Join Table Modal -->
     <div v-if="showMoveModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold text-gray-800">
-          {{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}
-        </h3>
+        <h3 class="text-lg font-bold text-gray-800">{{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}</h3>
         <p class="text-xs text-gray-500">Select target table for current Table {{ selectedTable }} orders.</p>
-        
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Target Table</label>
           <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500">
@@ -552,7 +525,6 @@
             </option>
           </select>
         </div>
-
         <div class="flex gap-3 pt-2">
           <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
           <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm">Confirm Move</button>
@@ -592,8 +564,10 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Reports Data State
-        const reportPeriod = ref('today');
+        // Advanced Date Filter State
+        const reportPreset = ref('today');
+        const startDate = ref(new Date().toISOString().split('T')[0]);
+        const endDate = ref(new Date().toISOString().split('T')[0]);
         const searchLog = ref('');
         const rawReportOrders = ref([]);
         const reportStats = ref({
@@ -607,9 +581,8 @@
           hourlySales: {}
         });
 
-        // Drag & Resize state
-        let draggingTable = null;
-        let resizingTable = null;
+        // Drag & Resize
+        let draggingTable = null, resizingTable = null;
         let startX = 0, startY = 0, startW = 0, startH = 0;
         let dragOffsetX = 0, dragOffsetY = 0;
 
@@ -617,11 +590,9 @@
         const showPaymentModal = ref(false);
         const selectedPayMethod = ref('Cash');
         const cashReceived = ref(0);
-
         const showPasswordModal = ref(false);
         const staffPassword = ref('');
         const pendingAction = ref(null);
-
         const showMoveModal = ref(false);
         const moveType = ref('transfer');
         const targetTableNo = ref('');
@@ -646,7 +617,7 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data: ordersData } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            const { data: ordersData } = await client.from('orders').select('*').neq('status', 'Paid').neq('status', 'Void').order('id', { ascending: true });
             allOrders.value = ordersData || [];
 
             const { data: menuData } = await client.from('menu').select('*').order('id', { ascending: true });
@@ -657,8 +628,7 @@
               layoutData.forEach(t => {
                 const found = dbTables.value.find(x => x.table_no === t.table_no);
                 if (found) {
-                  found.pos_x = t.pos_x;
-                  found.pos_y = t.pos_y;
+                  found.pos_x = t.pos_x; found.pos_y = t.pos_y;
                   if (t.width) found.width = t.width;
                   if (t.height) found.height = t.height;
                   if (t.shape) found.shape = t.shape;
@@ -666,44 +636,65 @@
               });
             }
           } catch (err) {
-            console.error("Fetch Data Error:", err.message);
+            console.error(err.message);
           } finally {
             loading.value = false;
           }
         };
 
-        const switchToReports = () => {
-          activeTab.value = 'reports';
+        const setReportPreset = (preset) => {
+          reportPreset.value = preset;
+          const now = new Date();
+          const format = (d) => d.toISOString().split('T')[0];
+
+          if (preset === 'today') {
+            startDate.value = format(now);
+            endDate.value = format(now);
+          } else if (preset === 'yesterday') {
+            const y = new Date(); y.setDate(y.getDate() - 1);
+            startDate.value = format(y);
+            endDate.value = format(y);
+          } else if (preset === 'week') {
+            const w = new Date(); w.setDate(w.getDate() - 7);
+            startDate.value = format(w);
+            endDate.value = format(now);
+          } else if (preset === 'month') {
+            const m = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate.value = format(m);
+            endDate.value = format(now);
+          } else if (preset === 'year') {
+            const yr = new Date(now.getFullYear(), 0, 1);
+            startDate.value = format(yr);
+            endDate.value = format(now);
+          } else if (preset === 'all') {
+            startDate.value = '2020-01-01';
+            endDate.value = format(now);
+          }
           fetchReportData();
         };
 
-        // Fetch & Calculate Full Business Analytics
+        const switchToReports = () => {
+          activeTab.value = 'reports';
+          setReportPreset('today');
+        };
+
+        // Fetch & Compute Analytics Report
         const fetchReportData = async () => {
           const client = initSupabase();
-          const { data: ordersData } = await client.from('orders').select('*');
+          const { data: ordersData } = await client.from('orders').select('*').order('id', { ascending: false });
           if (!ordersData) return;
 
-          rawReportOrders.value = ordersData;
+          const startTs = new Date(startDate.value + 'T00:00:00');
+          const endTs = new Date(endDate.value + 'T23:59:59');
 
-          // Filter by Time Period
-          const now = new Date();
-          let filtered = ordersData.filter(o => {
+          const filtered = ordersData.filter(o => {
             if (!o.created_at) return true;
             const d = new Date(o.created_at);
-            if (reportPeriod.value === 'today') return d.toDateString() === now.toDateString();
-            if (reportPeriod.value === 'yesterday') {
-              const y = new Date(); y.setDate(y.getDate() - 1);
-              return d.toDateString() === y.toDateString();
-            }
-            if (reportPeriod.value === 'week') {
-              const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-              return d >= weekAgo;
-            }
-            if (reportPeriod.value === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-            return true;
+            return d >= startTs && d <= endTs;
           });
 
-          // Metrics Calculation
+          rawReportOrders.value = filtered;
+
           let rev = 0, count = 0, voidAmt = 0, voidCnt = 0;
           let payMap = {};
           let itemMap = {};
@@ -718,7 +709,6 @@
               const m = o.pay_method || 'Cash';
               payMap[m] = (payMap[m] || 0) + total;
 
-              // Top Items Aggregation
               if (o.items && Array.isArray(o.items)) {
                 o.items.forEach(i => {
                   if (!itemMap[i.name]) itemMap[i.name] = { name: i.name, qty: 0, total: 0 };
@@ -727,7 +717,6 @@
                 });
               }
 
-              // Peak Hour Sales Calculation
               if (o.created_at) {
                 const h = new Date(o.created_at).getHours();
                 if (h < 12) hours['10-12'] += total;
@@ -769,11 +758,13 @@
         };
 
         const filteredLogs = computed(() => {
-          return rawReportOrders.value.filter(o => o.status === 'Paid' && (
-            !searchLog.value || 
-            (o.check_no && o.check_no.toLowerCase().includes(searchLog.value.toLowerCase())) ||
-            (o.table_no && o.table_no.toLowerCase().includes(searchLog.value.toLowerCase()))
-          )).slice(0, 30);
+          return rawReportOrders.value.filter(o => {
+            const matchQuery = !searchLog.value || 
+              (o.check_no && o.check_no.toLowerCase().includes(searchLog.value.toLowerCase())) ||
+              (o.table_no && o.table_no.toLowerCase().includes(searchLog.value.toLowerCase())) ||
+              (o.pay_method && o.pay_method.toLowerCase().includes(searchLog.value.toLowerCase()));
+            return matchQuery;
+          });
         });
 
         const getLogTotal = (o) => {
@@ -782,10 +773,52 @@
           return sub * 1.10;
         };
 
-        const formatTime = (ts) => {
+        const formatFullDateTime = (ts) => {
           if (!ts) return '-';
           const d = new Date(ts);
-          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // Reprint Any Historical Invoice/Receipt
+        const reprintInvoice = async (log) => {
+          try {
+            const checkNo = log.check_no || `CHK-${log.id}`;
+            const client = initSupabase();
+
+            // 1. 发送补打任务到 Supabase print_jobs 表（给热敏打印机）
+            await client.from('print_jobs').insert({
+              job_type: 'REPRINT_RECEIPT',
+              table_no: log.table_no,
+              content: { 
+                check_no: checkNo,
+                items: log.items || [], 
+                total: getLogTotal(log), 
+                pay_method: log.pay_method || 'Cash',
+                created_at: log.created_at,
+                is_reprint: true
+              }
+            });
+
+            alert(`Reprint Request Sent for ${checkNo} (Table ${log.table_no})!`);
+          } catch (err) {
+            alert("Reprint Failed: " + err.message);
+          }
+        };
+
+        // Trigger Standard Print for Z-Report
+        const printCurrentReport = async () => {
+          // 发送到 Supabase 打印任务
+          const client = initSupabase();
+          await client.from('print_jobs').insert({
+            job_type: 'Z_REPORT',
+            content: {
+              range: `${startDate.value} to ${endDate.value}`,
+              stats: reportStats.value
+            }
+          });
+
+          // 同时调起浏览器本地打印预览
+          window.print();
         };
 
         const handleMouseDown = (table, e) => {
@@ -797,68 +830,46 @@
 
         const startResize = (table, e) => {
           resizingTable = table;
-          startX = e.clientX;
-          startY = e.clientY;
-          startW = table.width;
-          startH = table.height;
+          startX = e.clientX; startY = e.clientY;
+          startW = table.width; startH = table.height;
         };
 
         const handleMouseMove = (e) => {
           if (resizingTable) {
             const deltaX = e.clientX - startX;
             const deltaY = e.clientY - startY;
-
             if (resizingTable.shape === 'circle') {
               const maxDelta = Math.max(deltaX, deltaY);
               const newSize = Math.max(70, startW + maxDelta);
-              resizingTable.width = newSize;
-              resizingTable.height = newSize;
+              resizingTable.width = newSize; resizingTable.height = newSize;
             } else {
               resizingTable.width = Math.max(70, startW + deltaX);
               resizingTable.height = Math.max(70, startH + deltaY);
             }
             return;
           }
-
           if (draggingTable && isEditLayout.value) {
             draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
             draggingTable.pos_y = Math.max(0, Math.min(400, e.clientY - dragOffsetY));
           }
         };
 
-        const handleMouseUp = () => {
-          draggingTable = null;
-          resizingTable = null;
-        };
+        const handleMouseUp = () => { draggingTable = null; resizingTable = null; };
 
         const setShape = (table, type) => {
           table.shape = type;
-          if (type === 'rect') {
-            table.width = 140;
-            table.height = 90;
-          } else if (type === 'circle') {
-            table.width = 110;
-            table.height = 110;
-          } else {
-            table.width = 100;
-            table.height = 100;
-          }
+          if (type === 'rect') { table.width = 140; table.height = 90; }
+          else if (type === 'circle') { table.width = 110; table.height = 110; }
+          else { table.width = 100; table.height = 100; }
         };
 
         const saveTablePositions = async () => {
           const client = initSupabase();
           for (const t of dbTables.value) {
-            await client.from('restaurant_tables').upsert({ 
-              table_no: t.table_no, 
-              pos_x: t.pos_x, 
-              pos_y: t.pos_y,
-              width: t.width,
-              height: t.height,
-              shape: t.shape
-            }, { onConflict: 'table_no' });
+            await client.from('restaurant_tables').upsert({ table_no: t.table_no, pos_x: t.pos_x, pos_y: t.pos_y, width: t.width, height: t.height, shape: t.shape }, { onConflict: 'table_no' });
           }
           isEditLayout.value = false;
-          alert("Layout saved successfully!");
+          alert("Layout saved!");
         };
 
         const toggleSoldOut = async (item) => {
@@ -868,56 +879,31 @@
           await client.from('menu').update({ is_sold_out: newStatus }).eq('id', item.id);
         };
 
-        const getTableOrders = (tableNo) => {
-          return allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid' && o.status !== 'Void');
-        };
-
-        const getTableStatus = (tableNo) => {
-          return getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
-        };
-
+        const getTableOrders = (tableNo) => allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid' && o.status !== 'Void');
+        const getTableStatus = (tableNo) => getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
         const getTableCheckNo = (tableNo) => {
           const orders = getTableOrders(tableNo);
-          if (orders.length === 0) return '-';
-          const first = orders[0];
-          return first.check_no || first.order_no || `CHK-${first.id}`;
+          return orders.length === 0 ? '-' : (orders[0].check_no || orders[0].order_no || `CHK-${orders[0].id}`);
         };
-
         const getTableItems = (tableNo) => {
-          const orders = getTableOrders(tableNo);
           let items = [];
-          orders.forEach(o => {
-            if (o.items && Array.isArray(o.items)) {
-              items = items.concat(o.items);
-            }
-          });
+          getTableOrders(tableNo).forEach(o => { if (o.items && Array.isArray(o.items)) items = items.concat(o.items); });
           return items;
         };
 
-        const removeItem = async (targetItem) => {
-          await updateItemQty(targetItem, -targetItem.qty);
-        };
-
+        const removeItem = async (targetItem) => { await updateItemQty(targetItem, -targetItem.qty); };
         const updateItemQty = async (targetItem, changeDelta) => {
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
-
           for (const order of activeOrders) {
             if (order.items && order.items.some(i => i.name === targetItem.name)) {
               let updatedItems = JSON.parse(JSON.stringify(order.items));
               const foundIndex = updatedItems.findIndex(i => i.name === targetItem.name);
-
               if (foundIndex !== -1) {
                 updatedItems[foundIndex].qty += changeDelta;
-                if (updatedItems[foundIndex].qty <= 0) {
-                  updatedItems.splice(foundIndex, 1);
-                }
-
-                if (updatedItems.length === 0) {
-                  await client.from('orders').delete().eq('id', order.id);
-                } else {
-                  await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
-                }
+                if (updatedItems[foundIndex].qty <= 0) updatedItems.splice(foundIndex, 1);
+                if (updatedItems.length === 0) await client.from('orders').delete().eq('id', order.id);
+                else await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
               }
               break;
             }
@@ -925,53 +911,27 @@
           await fetchData();
         };
 
-        const getTableSubtotal = (tableNo) => {
-          const items = getTableItems(tableNo);
-          return items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
-        };
+        const getTableSubtotal = (tableNo) => getTableItems(tableNo).reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
+        const getTableTotal = (tableNo) => getTableSubtotal(tableNo) * 1.10;
 
-        const getTableTotal = (tableNo) => {
-          return getTableSubtotal(tableNo) * 1.10;
-        };
+        const currentTableTotal = computed(() => selectedTable.value ? getTableTotal(selectedTable.value) : 0);
+        const cashChange = computed(() => Math.max(0, (cashReceived.value || 0) - currentTableTotal.value));
+        const availableTargetTables = computed(() => dbTables.value.filter(t => t.table_no !== selectedTable.value));
 
-        const currentTableTotal = computed(() => {
-          return selectedTable.value ? getTableTotal(selectedTable.value) : 0;
-        });
+        const selectTable = (tableNo) => { selectedTable.value = tableNo; isEditingItems.value = false; };
 
-        const cashChange = computed(() => {
-          return Math.max(0, (cashReceived.value || 0) - currentTableTotal.value);
-        });
-
-        const availableTargetTables = computed(() => {
-          return dbTables.value.filter(t => t.table_no !== selectedTable.value);
-        });
-
-        const selectTable = (tableNo) => {
-          selectedTable.value = tableNo;
-          isEditingItems.value = false;
-        };
-
-        const requestVoidOrder = () => {
-          pendingAction.value = 'void_order';
-          staffPassword.value = '';
-          showPasswordModal.value = true;
-        };
+        const requestVoidOrder = () => { pendingAction.value = 'void_order'; staffPassword.value = ''; showPasswordModal.value = true; };
 
         const verifyPasswordAndExecute = async () => {
-          if (staffPassword.value !== STAFF_PIN) {
-            return alert("Invalid Staff Password!");
-          }
+          if (staffPassword.value !== STAFF_PIN) return alert("Invalid PIN!");
           showPasswordModal.value = false;
-
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
-
           if (pendingAction.value === 'void_order') {
             const ids = activeOrders.map(o => o.id);
-            // 标记为 Void 状态用于报表作废统计
             await client.from('orders').update({ status: 'Void' }).in('id', ids);
             await fetchData();
-            alert(`Order for Table ${selectedTable.value} has been voided.`);
+            alert(`Table ${selectedTable.value} order voided.`);
           }
         };
 
@@ -987,34 +947,24 @@
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
           const ids = activeOrders.map(o => o.id);
-
           await client.from('orders').update({ table_no: targetTableNo.value }).in('id', ids);
           showMoveModal.value = false;
           selectedTable.value = targetTableNo.value;
           await fetchData();
-          alert(`Table updated to ${targetTableNo.value}!`);
         };
 
         const printCheckReceipt = async (tableNo) => {
           try {
             const activeOrders = getTableOrders(tableNo);
-            if (activeOrders.length === 0) return alert("No active orders found!");
-
-            const checkNo = getTableCheckNo(tableNo);
-            const items = getTableItems(tableNo);
-            const total = getTableTotal(tableNo);
-
+            if (activeOrders.length === 0) return alert("No active orders!");
             const client = initSupabase();
             await client.from('print_jobs').insert({
               job_type: 'CHECK',
               table_no: tableNo,
-              content: { check_no: checkNo, items, total, pax: 1 }
+              content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo), pax: 1 }
             });
-
-            alert(`Check Bill sent to printer for Table ${tableNo} [${checkNo}]`);
-          } catch (err) {
-            alert("Print Check Bill Failed: " + err.message);
-          }
+            alert(`Check printed for Table ${tableNo}`);
+          } catch (err) { alert("Print Check Failed: " + err.message); }
         };
 
         const openPaymentModal = (tableNo) => {
@@ -1030,38 +980,27 @@
             const activeOrders = getTableOrders(tableNo);
             if (activeOrders.length === 0) return;
 
-            const checkNo = getTableCheckNo(tableNo);
-            const items = getTableItems(tableNo);
-            const total = currentTableTotal.value;
-
             const client = initSupabase();
-
             await client.from('print_jobs').insert({
               job_type: 'RECEIPT',
               table_no: tableNo,
               content: { 
-                check_no: checkNo,
-                items, 
-                total, 
+                check_no: getTableCheckNo(tableNo),
+                items: getTableItems(tableNo), 
+                total: currentTableTotal.value, 
                 pay_method: selectedPayMethod.value,
-                cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
-                cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0,
-                pax: 1
+                cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : currentTableTotal.value,
+                cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
               }
             });
 
             const orderIds = activeOrders.map(o => o.id);
-            await client.from('orders').update({ 
-              status: 'Paid',
-              pay_method: selectedPayMethod.value 
-            }).in('id', orderIds);
+            await client.from('orders').update({ status: 'Paid', pay_method: selectedPayMethod.value }).in('id', orderIds);
 
             showPaymentModal.value = false;
             await fetchData();
-            alert(`Table ${tableNo} Checkout Completed via ${selectedPayMethod.value}!`);
-          } catch (err) {
-            alert("Checkout Failed: " + err.message);
-          }
+            alert(`Table ${tableNo} Checkout Complete!`);
+          } catch (err) { alert("Checkout Failed: " + err.message); }
         };
 
         onMounted(() => {
@@ -1070,58 +1009,16 @@
         });
 
         return {
-          activeTab,
-          isEditingItems,
-          isEditLayout,
-          dbTables,
-          allOrders,
-          menuList,
-          selectedTable,
-          loading,
-          reportPeriod,
-          searchLog,
-          reportStats,
-          filteredLogs,
-          switchToReports,
-          fetchReportData,
-          getPayPercentage,
-          getHourlyHeight,
-          getLogTotal,
-          formatTime,
-          showPaymentModal,
-          selectedPayMethod,
-          cashReceived,
-          cashChange,
-          currentTableTotal,
-          showPasswordModal,
-          staffPassword,
-          showMoveModal,
-          moveType,
-          targetTableNo,
-          availableTargetTables,
-          handleMouseDown,
-          startResize,
-          handleMouseMove,
-          handleMouseUp,
-          setShape,
-          saveTablePositions,
-          fetchData,
-          toggleSoldOut,
-          getTableStatus,
-          getTableCheckNo,
-          getTableItems,
-          removeItem,
-          updateItemQty,
-          getTableSubtotal,
-          getTableTotal,
-          selectTable,
-          requestVoidOrder,
-          verifyPasswordAndExecute,
-          openMoveModal,
-          confirmTableMove,
-          printCheckReceipt,
-          openPaymentModal,
-          confirmCheckout
+          activeTab, isEditingItems, isEditLayout, dbTables, allOrders, menuList, selectedTable, loading,
+          reportPreset, startDate, endDate, searchLog, reportStats, filteredLogs,
+          setReportPreset, switchToReports, fetchReportData, getPayPercentage, getHourlyHeight, getLogTotal, formatFullDateTime,
+          reprintInvoice, printCurrentReport,
+          showPaymentModal, selectedPayMethod, cashReceived, cashChange, currentTableTotal,
+          showPasswordModal, staffPassword, showMoveModal, moveType, targetTableNo, availableTargetTables,
+          handleMouseDown, startResize, handleMouseMove, handleMouseUp, setShape, saveTablePositions,
+          fetchData, toggleSoldOut, getTableStatus, getTableCheckNo, getTableItems, removeItem, updateItemQty,
+          getTableSubtotal, getTableTotal, selectTable, requestVoidOrder, verifyPasswordAndExecute,
+          openMoveModal, confirmTableMove, printCheckReceipt, openPaymentModal, confirmCheckout
         };
       }
     }).mount('#app');
