@@ -12,32 +12,17 @@
 <body class="bg-gray-100 min-h-screen">
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
-    <!-- Top Header Bar -->
-    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 flex-wrap gap-4">
+    <!-- Top Header Bar (完全复原原始版本) -->
+    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6">
       <div class="flex items-center space-x-3">
         <div class="bg-amber-500 text-white p-2 rounded-lg">
           <i class="fas fa-utensils text-xl"></i>
         </div>
         <div>
           <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
-          <p class="text-xs text-gray-500">Live Table & Menu Management</p>
+          <p class="text-xs text-gray-500">Live Table & Order Monitor</p>
         </div>
       </div>
-
-      <!-- Navigation Tabs -->
-      <div class="flex bg-gray-100 p-1 rounded-xl gap-1">
-        <button 
-          @click="activeTab = 'tables'" 
-          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-th"></i> Floor Layout
-        </button>
-        <button 
-          @click="activeTab = 'menu'" 
-          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-store-slash"></i> Sold Out Control
-        </button>
-      </div>
-
       <div class="flex items-center space-x-3">
         <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
           <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
@@ -45,8 +30,8 @@
       </div>
     </header>
 
-    <!-- Main View 1: Floor Layout / Tables View -->
-    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Grid Layout (完全复原原始版本) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
       <!-- Left 2 Cols: Table Management -->
       <div class="lg:col-span-2 space-y-6">
@@ -112,40 +97,17 @@
               </button>
             </div>
 
-            <!-- Table Items List with Live Cooking/Served Status Toggle -->
-            <div class="space-y-3 max-h-60 overflow-y-auto pr-1">
-              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50">
-                <div class="flex justify-between items-start text-sm">
-                  <div class="flex-1">
-                    <p class="font-bold text-gray-800">{{ item.name }} x{{ item.qty }}</p>
-                    <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                    <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
+            <!-- Table Items List (保持原汁原味的列表排版) -->
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                <div class="flex-1">
+                  <p class="font-medium text-gray-800">{{ item.name }} x{{ item.qty }}</p>
+                  <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
                 </div>
-
-                <!-- Status Switch Button (Pending -> Cooking -> Served) -->
-                <div class="mt-2 flex justify-between items-center pt-1 border-t border-gray-200/60 text-xs">
-                  <span class="text-gray-400">Status:</span>
-                  <button 
-                    @click="cycleItemStatus(item)" 
-                    :class="[
-                      'px-2 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1',
-                      (item.status || 'Pending') === 'Pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : '',
-                      (item.status || 'Pending') === 'Cooking' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' : '',
-                      (item.status || 'Pending') === 'Served' ? 'bg-green-100 text-green-800 hover:bg-green-200' : ''
-                    ]"
-                  >
-                    <i :class="[
-                      (item.status || 'Pending') === 'Pending' ? 'fas fa-clock' : '',
-                      (item.status || 'Pending') === 'Cooking' ? 'fas fa-fire' : '',
-                      (item.status || 'Pending') === 'Served' ? 'fas fa-check' : ''
-                    ]"></i>
-                    {{ item.status || 'Pending' }}
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
+                  <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
+                    <i class="fas fa-trash"></i>
                   </button>
                 </div>
               </div>
@@ -193,37 +155,7 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Main View 2: Sold Out Control -->
-    <div v-if="activeTab === 'menu'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management
-        </h2>
-        <span class="text-xs text-gray-500">Changes reflect instantly on customer phones.</span>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div v-for="item in menuList" :key="item.id" class="p-3 border rounded-xl flex justify-between items-center bg-gray-50">
-          <div>
-            <p class="font-bold text-gray-800 text-sm">{{ item.name }}</p>
-            <p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p>
-          </div>
-
-          <!-- Sold Out Switch -->
-          <button 
-            @click="toggleSoldOut(item)"
-            :class="[
-              'px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1',
-              item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'
-            ]"
-          >
-            <i :class="item.is_sold_out ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
-            {{ item.is_sold_out ? 'Sold Out' : 'Available' }}
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- Payment Modal -->
@@ -321,13 +253,11 @@
 
     createApp({
       setup() {
-        const activeTab = ref('tables'); // 'tables' or 'menu'
         const tables = ref([
           { id: 1, table_no: 'A01' }, { id: 2, table_no: 'A02' }, { id: 3, table_no: 'A03' }, { id: 4, table_no: 'A04' },
           { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
         ]);
         const allOrders = ref([]);
-        const menuList = ref([]);
         const selectedTable = ref(null);
         const loading = ref(false);
 
@@ -354,12 +284,9 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data: ordersData, error: ordersErr } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
-            if (ordersErr) throw ordersErr;
-            allOrders.value = ordersData || [];
-
-            const { data: menuData, error: menuErr } = await client.from('menu').select('*').order('id', { ascending: true });
-            if (!menuErr && menuData) menuList.value = menuData;
+            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            if (error) throw error;
+            allOrders.value = data || [];
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
           } finally {
@@ -372,37 +299,7 @@
           client
             .channel('admin_realtime_orders')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => fetchData())
             .subscribe();
-        };
-
-        // 一键开/关售罄 (Sold Out)
-        const toggleSoldOut = async (item) => {
-          const client = initSupabase();
-          const newStatus = !item.is_sold_out;
-          item.is_sold_out = newStatus; // 本地优先响应 UI
-          await client.from('menu').update({ is_sold_out: newStatus }).eq('id', item.id);
-        };
-
-        // 切换菜品状态 (Pending -> Cooking -> Served)
-        const cycleItemStatus = async (item) => {
-          const statusFlow = ['Pending', 'Cooking', 'Served'];
-          const currentIdx = statusFlow.indexOf(item.status || 'Pending');
-          const nextStatus = statusFlow[(currentIdx + 1) % statusFlow.length];
-
-          const client = initSupabase();
-          const activeOrders = getTableOrders(selectedTable.value);
-
-          for (const order of activeOrders) {
-            if (order.items && order.items.some(i => i.name === item.name)) {
-              order.items.forEach(i => {
-                if (i.name === item.name) i.status = nextStatus;
-              });
-              await client.from('orders').update({ items: order.items }).eq('id', order.id);
-              break;
-            }
-          }
-          await fetchData();
         };
 
         const getTableOrders = (tableNo) => {
@@ -599,10 +496,8 @@
         });
 
         return {
-          activeTab,
           tables,
           allOrders,
-          menuList,
           selectedTable,
           loading,
           showPaymentModal,
@@ -617,8 +512,6 @@
           targetTableNo,
           availableTargetTables,
           fetchData,
-          toggleSoldOut,
-          cycleItemStatus,
           getTableStatus,
           getTableCheckNo,
           getTableItems,
