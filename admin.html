@@ -209,12 +209,12 @@
 
                   <!-- Delete / Qty Controls in Edit Mode -->
                   <div v-if="isEditingItems" class="flex items-center gap-1.5">
-                    <!-- 如果只有 1 份：显示纯 Delete Icon 按钮直接删除 -->
+                    <!-- 仅有 1 份：显示单条垃圾桶删除按钮 -->
                     <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center transition" title="Delete Item">
                       <i class="fas fa-trash-alt text-xs"></i>
                     </button>
 
-                    <!-- 如果多于 1 份：显示 - 减数量、+ 加数量 -->
+                    <!-- 多于 1 份：显示 - / + 控件 -->
                     <template v-else>
                       <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded flex items-center justify-center">-</button>
                       <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
@@ -427,7 +427,7 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Drag & Resize internal state
+        // Drag & Resize state
         let draggingTable = null;
         let resizingTable = null;
         let startX = 0, startY = 0, startW = 0, startH = 0;
@@ -486,12 +486,11 @@
             }
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
-          } font-bold {
+          } finally {
             loading.value = false;
           }
         };
 
-        // Drag & Resize Handlers
         const handleMouseDown = (table, e) => {
           if (!isEditLayout.value) return;
           draggingTable = table;
@@ -513,7 +512,6 @@
             const deltaY = e.clientY - startY;
 
             if (resizingTable.shape === 'circle') {
-              // 圆形强制 width = height 同步等比例改变
               const maxDelta = Math.max(deltaX, deltaY);
               const newSize = Math.max(70, startW + maxDelta);
               resizingTable.width = newSize;
@@ -599,12 +597,10 @@
           return items;
         };
 
-        // 一键彻底删除 1 份菜品
         const removeItem = async (targetItem) => {
           await updateItemQty(targetItem, -targetItem.qty);
         };
 
-        // 修改单品数量（增减与清理）
         const updateItemQty = async (targetItem, changeDelta) => {
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
