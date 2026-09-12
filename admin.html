@@ -19,6 +19,7 @@
       cursor: se-resize;
       background: #f59e0b;
       border-radius: 2px;
+      z-index: 20;
     }
   </style>
 </head>
@@ -33,7 +34,9 @@
         </div>
         <div>
           <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
-          <p class="text-xs text-gray-500">Live Table & Order Monitor</p>
+          <p class="text-xs text-green-600 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> Live Real-time Connected
+          </p>
         </div>
       </div>
 
@@ -53,7 +56,7 @@
 
       <div class="flex items-center space-x-3">
         <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
-          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
+          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Sync Now
         </button>
       </div>
     </header>
@@ -75,7 +78,7 @@
                 @click="isEditLayout = !isEditLayout" 
                 :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1', isEditLayout ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
                 <i class="fas" :class="isEditLayout ? 'fa-check' : 'fa-arrows-alt'"></i>
-                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Edit Tables' }}
+                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Resize Tables' }}
               </button>
               <button v-if="isEditLayout" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 shadow transition flex items-center gap-1">
                 <i class="fas fa-save"></i> Save Layout
@@ -97,8 +100,8 @@
               @click="!isEditLayout && selectTable(table.table_no)"
               :style="{ left: table.pos_x + 'px', top: table.pos_y + 'px', width: table.width + 'px', height: table.height + 'px' }"
               :class="[
-                'absolute p-3 rounded-xl border-2 transition-shadow flex flex-col justify-between overflow-hidden',
-                table.shape === 'circle' ? 'circle-table justify-center items-center text-center' : '',
+                'absolute p-3 border-2 transition-all flex flex-col justify-between overflow-hidden',
+                table.shape === 'circle' ? 'circle-table items-center text-center' : 'rounded-xl',
                 isEditLayout ? 'cursor-move ring-2 ring-amber-400 bg-white shadow-lg' : 'cursor-pointer',
                 selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-200 bg-white',
                 !isEditLayout && getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : ''
@@ -107,7 +110,7 @@
               <!-- Normal Layout -->
               <template v-if="!isEditLayout">
                 <div class="flex justify-between items-start w-full">
-                  <span class="font-bold text-sm text-gray-800">Table {{ table.table_no }}</span>
+                  <span class="font-bold text-sm text-gray-800">T-{{ table.table_no }}</span>
                   <span :class="[
                     'px-1.5 py-0.5 text-[9px] font-semibold rounded-full',
                     getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
@@ -128,7 +131,7 @@
               <!-- Edit Mode Controls -->
               <template v-else>
                 <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">
-                  Table {{ table.table_no }}
+                  T-{{ table.table_no }}
                 </div>
                 <!-- Controls for Shape Switch -->
                 <div class="flex justify-center gap-1 z-10 my-1">
@@ -136,7 +139,7 @@
                   <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">R</button>
                   <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">C</button>
                 </div>
-                <!-- Resize Handle -->
+                <!-- Resize Handle (支持圆形自由放缩) -->
                 <div class="resize-handle" @mousedown.stop="startResize(table, $event)"></div>
               </template>
             </div>
@@ -161,25 +164,50 @@
             <!-- Transfer & Join Actions -->
             <div v-if="getTableItems(selectedTable).length > 0" class="flex gap-2">
               <button @click="openMoveModal('transfer')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
-                <i class="fas fa-exchange-alt"></i> Transfer Table
+                <i class="fas fa-exchange-alt"></i> Transfer
               </button>
               <button @click="openMoveModal('join')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
                 <i class="fas fa-object-group"></i> Join Table
               </button>
             </div>
 
-            <!-- Table Items List -->
-            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                <div class="flex-1">
-                  <p class="font-medium text-gray-800">{{ item.name }} x{{ item.qty }}</p>
-                  <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
+            <!-- Table Items List with Kitchen Cooking Status -->
+            <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50/50 space-y-1">
+                <div class="flex justify-between items-start text-sm">
+                  <div class="flex-1 pr-2">
+                    <p class="font-bold text-gray-800">{{ item.name }}</p>
+                    <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
+                  </div>
+                  
+                  <span class="font-bold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  <button v-if="isEditingItems" @click="requestDeleteItem(item)" class="text-red-500 hover:text-red-700 text-xs p-1 bg-red-50 rounded">
-                    <i class="fas fa-trash"></i>
-                  </button>
+
+                <!-- 菜品出餐状态 (Pending / Cooking / Served) 与 数量操作 -->
+                <div class="flex justify-between items-center pt-1 border-t border-gray-100 text-xs">
+                  <!-- 状态展示标签 -->
+                  <span :class="[
+                    'px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1',
+                    item.status === 'Served' ? 'bg-green-100 text-green-700' :
+                    item.status === 'Cooking' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800'
+                  ]">
+                    <i :class="[
+                      'fas text-[8px]',
+                      item.status === 'Served' ? 'fa-check-circle' :
+                      item.status === 'Cooking' ? 'fa-fire' : 'fa-clock'
+                    ]"></i>
+                    {{ item.status || 'Pending' }}
+                  </span>
+
+                  <!-- 编辑模式下的 ＋ － 按钮 -->
+                  <div v-if="isEditingItems" class="flex items-center gap-1">
+                    <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded flex items-center justify-center">-</button>
+                    <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
+                    <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 hover:bg-green-200 text-green-700 font-bold rounded flex items-center justify-center">+</button>
+                  </div>
+                  <div v-else class="text-xs text-gray-500 font-semibold">
+                    Qty: x{{ item.qty }}
+                  </div>
                 </div>
               </div>
 
@@ -188,13 +216,13 @@
               </div>
             </div>
 
-            <!-- 开关：显示删除按键 -->
+            <!-- 开关：显示管理与增减菜品按键 -->
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
               <button 
                 @click="isEditingItems = !isEditingItems" 
-                :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100']">
+                :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100']">
                 <i class="fas" :class="isEditingItems ? 'fa-check' : 'fa-edit'"></i>
-                {{ isEditingItems ? 'Done Modifying Items' : 'Manage / Delete Order Items' }}
+                {{ isEditingItems ? 'Done Editing Items' : 'Manage Items (Add / Edit Qty)' }}
               </button>
             </div>
 
@@ -397,7 +425,6 @@
         const showPasswordModal = ref(false);
         const staffPassword = ref('');
         const pendingAction = ref(null);
-        const pendingItemTarget = ref(null);
 
         const showMoveModal = ref(false);
         const moveType = ref('transfer');
@@ -406,6 +433,18 @@
         const initSupabase = () => {
           if (!supabaseClient) supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
           return supabaseClient;
+        };
+
+        // --- 核心：配置 Supabase 实时推送 (Real-time Listener) ---
+        const setupRealtimeSubscription = () => {
+          const client = initSupabase();
+          client
+            .channel('admin_realtime_orders')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+              console.log("Realtime order update:", payload);
+              fetchData(); // 收到新订单/更新时，自动无感刷数据
+            })
+            .subscribe();
         };
 
         const fetchData = async () => {
@@ -456,8 +495,18 @@
 
         const handleMouseMove = (e) => {
           if (resizingTable) {
-            resizingTable.width = Math.max(80, startW + (e.clientX - startX));
-            resizingTable.height = Math.max(80, startH + (e.clientY - startY));
+            const newW = Math.max(70, startW + (e.clientX - startX));
+            const newH = Math.max(70, startH + (e.clientY - startY));
+
+            // 如果是圆形，保持宽高度同步缩放
+            if (resizingTable.shape === 'circle') {
+              const size = Math.max(newW, newH);
+              resizingTable.width = size;
+              resizingTable.height = size;
+            } else {
+              resizingTable.width = newW;
+              resizingTable.height = newH;
+            }
             return;
           }
           if (draggingTable && isEditLayout.value) {
@@ -474,7 +523,7 @@
         const setShape = (table, type) => {
           table.shape = type;
           if (type === 'rect') {
-            table.width = 160;
+            table.width = 150;
             table.height = 90;
           } else if (type === 'circle') {
             table.width = 110;
@@ -498,7 +547,7 @@
             }, { onConflict: 'table_no' });
           }
           isEditLayout.value = false;
-          alert("Layout saved permanently to Supabase!");
+          alert("Layout saved successfully!");
         };
 
         const toggleSoldOut = async (item) => {
@@ -534,6 +583,34 @@
           return items;
         };
 
+        // 修改单品数量（增加或删减，减到0自动删除）
+        const updateItemQty = async (targetItem, changeDelta) => {
+          const client = initSupabase();
+          const activeOrders = getTableOrders(selectedTable.value);
+
+          for (const order of activeOrders) {
+            if (order.items && order.items.some(i => i.name === targetItem.name)) {
+              let updatedItems = JSON.parse(JSON.stringify(order.items));
+              const foundIndex = updatedItems.findIndex(i => i.name === targetItem.name);
+
+              if (foundIndex !== -1) {
+                updatedItems[foundIndex].qty += changeDelta;
+                if (updatedItems[foundIndex].qty <= 0) {
+                  updatedItems.splice(foundIndex, 1);
+                }
+
+                if (updatedItems.length === 0) {
+                  await client.from('orders').delete().eq('id', order.id);
+                } else {
+                  await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
+                }
+              }
+              break;
+            }
+          }
+          await fetchData();
+        };
+
         const getTableSubtotal = (tableNo) => {
           const items = getTableItems(tableNo);
           return items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
@@ -561,13 +638,6 @@
           isEditingItems.value = false;
         };
 
-        const requestDeleteItem = (item) => {
-          pendingAction.value = 'delete_item';
-          pendingItemTarget.value = item;
-          staffPassword.value = '';
-          showPasswordModal.value = true;
-        };
-
         const requestVoidOrder = () => {
           pendingAction.value = 'void_order';
           staffPassword.value = '';
@@ -588,20 +658,6 @@
             await client.from('orders').delete().in('id', ids);
             await fetchData();
             alert(`Order for Table ${selectedTable.value} has been voided.`);
-          } else if (pendingAction.value === 'delete_item') {
-            const target = pendingItemTarget.value;
-            for (const order of activeOrders) {
-              if (order.items && order.items.some(i => i.name === target.name)) {
-                const updatedItems = order.items.filter(i => i !== target);
-                if (updatedItems.length === 0) {
-                  await client.from('orders').delete().eq('id', order.id);
-                } else {
-                  await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
-                }
-                break;
-              }
-            }
-            await fetchData();
           }
         };
 
@@ -622,7 +678,7 @@
           showMoveModal.value = false;
           selectedTable.value = targetTableNo.value;
           await fetchData();
-          alert(`Table successfully updated to ${targetTableNo.value}!`);
+          alert(`Table updated to ${targetTableNo.value}!`);
         };
 
         const printCheckReceipt = async (tableNo) => {
@@ -696,6 +752,7 @@
 
         onMounted(() => {
           fetchData();
+          setupRealtimeSubscription(); // 开启实时进单订阅
         });
 
         return {
@@ -729,10 +786,10 @@
           getTableStatus,
           getTableCheckNo,
           getTableItems,
+          updateItemQty,
           getTableSubtotal,
           getTableTotal,
           selectTable,
-          requestDeleteItem,
           requestVoidOrder,
           verifyPasswordAndExecute,
           openMoveModal,
