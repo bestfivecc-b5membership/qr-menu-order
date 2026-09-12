@@ -8,6 +8,19 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    .circle-table { border-radius: 50% !important; }
+    .resize-handle {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 14px;
+      height: 14px;
+      cursor: se-resize;
+      background: #f59e0b;
+      border-radius: 2px;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
@@ -62,7 +75,7 @@
                 @click="isEditLayout = !isEditLayout" 
                 :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1', isEditLayout ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
                 <i class="fas" :class="isEditLayout ? 'fa-check' : 'fa-arrows-alt'"></i>
-                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Rearrange Tables' }}
+                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Edit Tables' }}
               </button>
               <button v-if="isEditLayout" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 shadow transition flex items-center gap-1">
                 <i class="fas fa-save"></i> Save Layout
@@ -70,10 +83,10 @@
             </div>
           </div>
 
-          <!-- Free-Drag Canvas Arena -->
+          <!-- Canvas Area -->
           <div 
-            class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden" 
-            style="height: 500px;" 
+            class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden select-none" 
+            style="height: 520px;" 
             @mousemove="handleMouseMove" 
             @mouseup="handleMouseUp"
           >
@@ -82,31 +95,50 @@
               :key="table.table_no"
               @mousedown="handleMouseDown(table, $event)"
               @click="!isEditLayout && selectTable(table.table_no)"
-              :style="{ left: table.pos_x + 'px', top: table.pos_y + 'px' }"
+              :style="{ left: table.pos_x + 'px', top: table.pos_y + 'px', width: table.width + 'px', height: table.height + 'px' }"
               :class="[
-                'absolute w-32 h-28 p-3 rounded-xl border-2 transition-shadow select-none flex flex-col justify-between',
+                'absolute p-3 rounded-xl border-2 transition-shadow flex flex-col justify-between overflow-hidden',
+                table.shape === 'circle' ? 'circle-table justify-center items-center text-center' : '',
                 isEditLayout ? 'cursor-move ring-2 ring-amber-400 bg-white shadow-lg' : 'cursor-pointer',
                 selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-200 bg-white',
                 !isEditLayout && getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : ''
               ]"
             >
-              <div class="flex justify-between items-start">
-                <span class="font-bold text-base text-gray-800">Table {{ table.table_no }}</span>
-                <span :class="[
-                  'px-1.5 py-0.5 text-[10px] font-semibold rounded-full',
-                  getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                ]">
-                  {{ getTableStatus(table.table_no) }}
-                </span>
-              </div>
+              <!-- Normal Layout -->
+              <template v-if="!isEditLayout">
+                <div class="flex justify-between items-start w-full">
+                  <span class="font-bold text-sm text-gray-800">Table {{ table.table_no }}</span>
+                  <span :class="[
+                    'px-1.5 py-0.5 text-[9px] font-semibold rounded-full',
+                    getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                  ]">
+                    {{ getTableStatus(table.table_no) }}
+                  </span>
+                </div>
 
-              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-1">
-                <p class="text-[10px] text-gray-500 truncate">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
-                <p class="text-xs font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
-              </div>
-              <div v-else class="text-[10px] text-gray-400">
-                Ready
-              </div>
+                <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-1">
+                  <p class="text-[10px] text-gray-500 truncate">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
+                  <p class="text-xs font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
+                </div>
+                <div v-else class="text-[10px] text-gray-400">
+                  Ready
+                </div>
+              </template>
+
+              <!-- Edit Mode Controls -->
+              <template v-else>
+                <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">
+                  Table {{ table.table_no }}
+                </div>
+                <!-- Controls for Shape Switch -->
+                <div class="flex justify-center gap-1 z-10 my-1">
+                  <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">S</button>
+                  <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">R</button>
+                  <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">C</button>
+                </div>
+                <!-- Resize Handle -->
+                <div class="resize-handle" @mousedown.stop="startResize(table, $event)"></div>
+              </template>
             </div>
           </div>
         </div>
@@ -145,7 +177,6 @@
                 </div>
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  <!-- 删除按钮只在开启 Edit 模式下显示 -->
                   <button v-if="isEditingItems" @click="requestDeleteItem(item)" class="text-red-500 hover:text-red-700 text-xs p-1 bg-red-50 rounded">
                     <i class="fas fa-trash"></i>
                   </button>
@@ -157,7 +188,7 @@
               </div>
             </div>
 
-            <!-- 增加：修改/删除菜品的专有开关按钮 -->
+            <!-- 开关：显示删除按键 -->
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
               <button 
                 @click="isEditingItems = !isEditingItems" 
@@ -223,7 +254,6 @@
             <p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p>
           </div>
 
-          <!-- Sold Out Switch -->
           <button 
             @click="toggleSoldOut(item)"
             :class="[
@@ -334,18 +364,18 @@
     createApp({
       setup() {
         const activeTab = ref('tables');
-        const isEditingItems = ref(false); // 控制菜品删除图标的显示
-        const isEditLayout = ref(false); // 控制桌号拉拽编辑
+        const isEditingItems = ref(false);
+        const isEditLayout = ref(false);
 
         const dbTables = ref([
-          { table_no: 'A01', pos_x: 30, pos_y: 30 },
-          { table_no: 'A02', pos_x: 180, pos_y: 30 },
-          { table_no: 'A03', pos_x: 330, pos_y: 30 },
-          { table_no: 'A04', pos_x: 480, pos_y: 30 },
-          { table_no: 'B01', pos_x: 30, pos_y: 180 },
-          { table_no: 'B02', pos_x: 180, pos_y: 180 },
-          { table_no: 'B03', pos_x: 330, pos_y: 180 },
-          { table_no: 'B04', pos_x: 480, pos_y: 180 }
+          { table_no: 'A01', pos_x: 30, pos_y: 30, width: 120, height: 100, shape: 'square' },
+          { table_no: 'A02', pos_x: 180, pos_y: 30, width: 120, height: 100, shape: 'square' },
+          { table_no: 'A03', pos_x: 330, pos_y: 30, width: 120, height: 100, shape: 'square' },
+          { table_no: 'A04', pos_x: 480, pos_y: 30, width: 120, height: 100, shape: 'square' },
+          { table_no: 'B01', pos_x: 30, pos_y: 180, width: 120, height: 100, shape: 'square' },
+          { table_no: 'B02', pos_x: 180, pos_y: 180, width: 120, height: 100, shape: 'square' },
+          { table_no: 'B03', pos_x: 330, pos_y: 180, width: 120, height: 100, shape: 'square' },
+          { table_no: 'B04', pos_x: 480, pos_y: 180, width: 120, height: 100, shape: 'square' }
         ]);
 
         const allOrders = ref([]);
@@ -353,10 +383,11 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Drag state
+        // Drag & Resize state
         let draggingTable = null;
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
+        let resizingTable = null;
+        let startX = 0, startY = 0, startW = 0, startH = 0;
+        let dragOffsetX = 0, dragOffsetY = 0;
 
         // Modals
         const showPaymentModal = ref(false);
@@ -394,6 +425,9 @@
                 if (found) {
                   found.pos_x = t.pos_x;
                   found.pos_y = t.pos_y;
+                  if (t.width) found.width = t.width;
+                  if (t.height) found.height = t.height;
+                  if (t.shape) found.shape = t.shape;
                 }
               });
             }
@@ -404,7 +438,7 @@
           }
         };
 
-        // --- Drag Table Logic ---
+        // --- Drag & Resize Logic ---
         const handleMouseDown = (table, e) => {
           if (!isEditLayout.value) return;
           draggingTable = table;
@@ -412,26 +446,61 @@
           dragOffsetY = e.clientY - table.pos_y;
         };
 
+        const startResize = (table, e) => {
+          resizingTable = table;
+          startX = e.clientX;
+          startY = e.clientY;
+          startW = table.width;
+          startH = table.height;
+        };
+
         const handleMouseMove = (e) => {
-          if (!draggingTable || !isEditLayout.value) return;
-          draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
-          draggingTable.pos_y = Math.max(0, Math.min(380, e.clientY - dragOffsetY));
+          if (resizingTable) {
+            resizingTable.width = Math.max(80, startW + (e.clientX - startX));
+            resizingTable.height = Math.max(80, startH + (e.clientY - startY));
+            return;
+          }
+          if (draggingTable && isEditLayout.value) {
+            draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
+            draggingTable.pos_y = Math.max(0, Math.min(400, e.clientY - dragOffsetY));
+          }
         };
 
         const handleMouseUp = () => {
           draggingTable = null;
+          resizingTable = null;
+        };
+
+        const setShape = (table, type) => {
+          table.shape = type;
+          if (type === 'rect') {
+            table.width = 160;
+            table.height = 90;
+          } else if (type === 'circle') {
+            table.width = 110;
+            table.height = 110;
+          } else {
+            table.width = 110;
+            table.height = 100;
+          }
         };
 
         const saveTablePositions = async () => {
           const client = initSupabase();
           for (const t of dbTables.value) {
-            await client.from('restaurant_tables').upsert({ table_no: t.table_no, pos_x: t.pos_x, pos_y: t.pos_y }, { onConflict: 'table_no' });
+            await client.from('restaurant_tables').upsert({ 
+              table_no: t.table_no, 
+              pos_x: t.pos_x, 
+              pos_y: t.pos_y,
+              width: t.width,
+              height: t.height,
+              shape: t.shape
+            }, { onConflict: 'table_no' });
           }
           isEditLayout.value = false;
-          alert("Floor layout saved successfully!");
+          alert("Layout saved permanently to Supabase!");
         };
 
-        // 开关估清 (Sold Out)
         const toggleSoldOut = async (item) => {
           const client = initSupabase();
           const newStatus = !item.is_sold_out;
@@ -492,7 +561,6 @@
           isEditingItems.value = false;
         };
 
-        // 删除菜品与 Void Order
         const requestDeleteItem = (item) => {
           pendingAction.value = 'delete_item';
           pendingItemTarget.value = item;
@@ -537,7 +605,6 @@
           }
         };
 
-        // 换桌 & 合单
         const openMoveModal = (type) => {
           moveType.value = type;
           const firstAvail = availableTargetTables.value[0];
@@ -558,7 +625,6 @@
           alert(`Table successfully updated to ${targetTableNo.value}!`);
         };
 
-        // 结账逻辑
         const printCheckReceipt = async (tableNo) => {
           try {
             const activeOrders = getTableOrders(tableNo);
@@ -653,8 +719,10 @@
           targetTableNo,
           availableTargetTables,
           handleMouseDown,
+          startResize,
           handleMouseMove,
           handleMouseUp,
+          setShape,
           saveTablePositions,
           fetchData,
           toggleSoldOut,
