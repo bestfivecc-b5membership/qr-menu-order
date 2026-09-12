@@ -47,7 +47,7 @@
           <i class="fas fa-store-slash"></i> Sold Out Control
         </button>
         <button @click="switchToReports" :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-chart-line"></i> Full Ledger Reports
+          <i class="fas fa-chart-line"></i> Full Ledger & Analytics
         </button>
       </div>
 
@@ -203,25 +203,25 @@
       </div>
     </div>
 
-    <!-- TAB 3: GRANULAR AUDIT & EXCEL LEDGER REPORT VIEW -->
+    <!-- TAB 3: REPORTS, ANALYTICS & EXCEL LEDGER (RECOMBINED & RESTORED) -->
     <div v-if="activeTab === 'reports'" class="space-y-6">
       
-      <!-- Top Action Bar & Filters -->
+      <!-- Top Action Bar & Date Range Presets -->
       <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
         <div class="flex flex-wrap justify-between items-center gap-4 border-b pb-3">
           <div>
             <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-table text-amber-500"></i> Detailed Excel Audit Ledger & Reports
+              <i class="fas fa-chart-line text-amber-500"></i> Analytics & Detailed Excel Audit Ledger
             </h2>
-            <p class="text-xs text-gray-500">Comprehensive breakdown of all orders, line-item contents, payment methods, and timestamps.</p>
+            <p class="text-xs text-gray-500">Combined Top-seller insights and invoice-level granular ledger.</p>
           </div>
 
           <div class="flex items-center gap-2">
             <button @click="exportToCSV" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
-              <i class="fas fa-file-excel"></i> Export Detailed Excel (CSV)
+              <i class="fas fa-file-excel"></i> Export Excel (CSV)
             </button>
             <button @click="printCurrentReport" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
-              <i class="fas fa-print"></i> Print Z-Report PDF
+              <i class="fas fa-print"></i> Print Z-Report
             </button>
           </div>
         </div>
@@ -236,7 +236,7 @@
                 { id: 'week', label: 'This Week' },
                 { id: 'month', label: 'This Month' },
                 { id: 'year', label: 'Annual (This Year)' },
-                { id: 'all', label: 'All Time Records' }
+                { id: 'all', label: 'All Time' }
               ]" 
               :key="p.id"
               @click="setReportPreset(p.id)"
@@ -255,7 +255,7 @@
         </div>
       </div>
 
-      <!-- Overview Stats KPI Grid -->
+      <!-- KPI Overview Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
           <span class="text-xs font-semibold uppercase text-gray-500">Gross Revenue</span>
@@ -265,17 +265,60 @@
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
           <span class="text-xs font-semibold uppercase text-gray-500">Service Tax (10%)</span>
           <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.totalTax.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">Tax Liability</span>
+          <span class="text-[10px] text-gray-400">Tax Collected</span>
         </div>
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Total Checks Completed</span>
+          <span class="text-xs font-semibold uppercase text-gray-500">Total Checks</span>
           <p class="text-2xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
           <span class="text-[10px] text-gray-400">Avg Ticket: RM {{ reportStats.avgTicket.toFixed(2) }}</span>
         </div>
         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Voided Transactions</span>
+          <span class="text-xs font-semibold uppercase text-gray-500">Voided Amount</span>
           <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Cancelled Checks</span>
+          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Voided Checks</span>
+        </div>
+      </div>
+
+      <!-- RESTORED: ANALYTICS & TOP 5 DISHES SECTION -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Top 5 Dishes Ranking -->
+        <div class="bg-white p-5 rounded-xl shadow-sm lg:col-span-2 space-y-4">
+          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+            <i class="fas fa-trophy text-amber-500"></i> Top 5 Best-Selling Dishes (Quantity & Revenue)
+          </h3>
+          <div class="space-y-3">
+            <div v-for="(item, idx) in top5Dishes" :key="idx" class="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+              <div class="flex items-center gap-3">
+                <span :class="['w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs', idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-gray-300 text-gray-700' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-gray-200 text-gray-600']">
+                  {{ idx + 1 }}
+                </span>
+                <div>
+                  <p class="font-bold text-sm text-gray-800">{{ item.name }}</p>
+                  <p class="text-xs text-gray-500">Sold: <strong class="text-amber-600">{{ item.qty }}</strong> portions</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="font-bold text-sm text-gray-800">RM {{ item.totalRev.toFixed(2) }}</p>
+                <div class="w-24 bg-gray-200 h-1.5 rounded-full overflow-hidden mt-1">
+                  <div class="bg-amber-500 h-full" :style="{ width: (item.totalRev / (top5Dishes[0]?.totalRev || 1) * 100) + '%' }"></div>
+                </div>
+              </div>
+            </div>
+            <div v-if="top5Dishes.length === 0" class="text-center py-6 text-gray-400 text-xs">No sales data for top dishes in this period.</div>
+          </div>
+        </div>
+
+        <!-- Payment Methods Breakdown -->
+        <div class="bg-white p-5 rounded-xl shadow-sm space-y-4">
+          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+            <i class="fas fa-wallet text-amber-500"></i> Payment Distribution
+          </h3>
+          <div class="space-y-3">
+            <div v-for="(val, method) in paymentBreakdown" :key="method" class="flex justify-between items-center p-2 border-b text-xs">
+              <span class="font-semibold text-gray-700">{{ method }}</span>
+              <span class="font-mono font-bold text-gray-900">RM {{ val.toFixed(2) }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -284,15 +327,15 @@
         <div class="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
           <div class="flex items-center gap-3">
             <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-list-alt text-amber-500"></i> Full Detailed Transaction Ledger
+              <i class="fas fa-list-alt text-amber-500"></i> Granular Invoice Ledger
             </h3>
             <span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
-              {{ filteredLogs.length }} Receipts Found
+              {{ filteredLogs.length }} Receipts
             </span>
           </div>
 
           <div class="flex items-center gap-2">
-            <input type="text" v-model="searchLog" placeholder="Search Check#, Table, Item, Method..." class="px-3 py-1.5 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500 w-64" />
+            <input type="text" v-model="searchLog" placeholder="Search Check#, Table, Item..." class="px-3 py-1.5 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500 w-64" />
           </div>
         </div>
 
@@ -300,16 +343,16 @@
         <div class="overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
-              <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase tracking-wider">
+              <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
                 <th class="p-3 border-r">Date & Time</th>
                 <th class="p-3 border-r">Check #</th>
                 <th class="p-3 border-r">Table</th>
                 <th class="p-3 border-r">Status</th>
-                <th class="p-3 border-r">Payment Method</th>
-                <th class="p-3 border-r w-2/5">Itemized Contents (Qty x Dish @ Price)</th>
+                <th class="p-3 border-r">Method</th>
+                <th class="p-3 border-r w-2/5">Itemized Line Items</th>
                 <th class="p-3 border-r text-right">Subtotal</th>
-                <th class="p-3 border-r text-right">Tax (10%)</th>
-                <th class="p-3 border-r text-right font-bold text-black">Grand Total</th>
+                <th class="p-3 border-r text-right">Tax 10%</th>
+                <th class="p-3 border-r text-right font-bold text-black">Total</th>
                 <th class="p-3 text-center">Action</th>
               </tr>
             </thead>
@@ -325,7 +368,6 @@
                 </td>
                 <td class="p-3 border-r font-semibold whitespace-nowrap">{{ log.pay_method || 'Cash' }}</td>
                 
-                <!-- Detailed Line Items Breakdown -->
                 <td class="p-3 border-r">
                   <div class="space-y-1">
                     <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded text-[11px]">
@@ -358,12 +400,12 @@
 
     </div>
 
-    <!-- REPRINT PRINTER SELECTION MODAL -->
+    <!-- REPRINT PRINTER SELECTION MODAL (FIXED PRINTER ROUTING) -->
     <div v-if="showReprintModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
         <div class="flex justify-between items-center border-b pb-2">
           <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-print text-amber-500"></i> Reprint Invoice Destination
+            <i class="fas fa-print text-amber-500"></i> Select Output Printer / Channel
           </h3>
           <button @click="showReprintModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
         </div>
@@ -373,14 +415,14 @@
         </p>
 
         <div class="space-y-2">
-          <label class="block text-xs font-bold text-gray-700">Select Target Output Device / Channel:</label>
+          <label class="block text-xs font-bold text-gray-700">Select Hardware Destination:</label>
           <div class="space-y-2">
             <label v-for="p in printerOptions" :key="p.id" :class="['flex items-center justify-between p-3 border rounded-xl cursor-pointer transition', selectedPrinterId === p.id ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' : 'bg-gray-50 hover:bg-gray-100']">
               <div class="flex items-center gap-3">
                 <input type="radio" :value="p.id" v-model="selectedPrinterId" class="text-amber-500 focus:ring-amber-400" />
                 <div>
                   <p class="font-bold text-sm text-gray-800">{{ p.name }}</p>
-                  <p class="text-[10px] text-gray-500 font-mono">{{ p.ip }}</p>
+                  <p class="text-[10px] text-gray-500 font-mono">IP: {{ p.ip }}</p>
                 </div>
               </div>
               <i :class="[p.icon, 'text-gray-400 text-lg']"></i>
@@ -400,7 +442,7 @@
     <!-- Hidden PDF Print View -->
     <div id="printable-report" class="hidden print:block p-8">
       <div class="text-center border-b pb-4 mb-4">
-        <h1 class="text-2xl font-bold">B5 Cuisine - Detailed Z-Report Ledger</h1>
+        <h1 class="text-2xl font-bold">B5 Cuisine - Z-Report Ledger</h1>
         <p class="text-sm">Period: {{ startDate }} to {{ endDate }}</p>
         <p class="text-xs text-gray-500">Generated: {{ new Date().toLocaleString() }}</p>
       </div>
@@ -538,7 +580,7 @@
         const printerOptions = ref([
           { id: 'bar', name: 'Bar Thermal Printer', ip: '192.168.1.93', icon: 'fas fa-glass-martini-alt' },
           { id: 'counter', name: 'Counter Cashier Printer', ip: '192.168.1.100', icon: 'fas fa-cash-register' },
-          { id: 'pdf', name: 'Export PDF Document (Download)', ip: 'Virtual Browser Printer', icon: 'fas fa-file-pdf' }
+          { id: 'pdf', name: 'Export PDF Document (Download)', ip: 'Virtual Printer', icon: 'fas fa-file-pdf' }
         ]);
 
         // Drag & Modals
@@ -665,6 +707,31 @@
           };
         };
 
+        // RESTORED COMPUTED ANALYTICS: TOP 5 DISHES & PAYMENT METHODS
+        const top5Dishes = computed(() => {
+          const dishMap = {};
+          rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
+            (o.items || []).forEach(item => {
+              const name = item.name;
+              const q = Number(item.qty || 1);
+              const price = Number(item.price || 0);
+              if (!dishMap[name]) dishMap[name] = { name, qty: 0, totalRev: 0 };
+              dishMap[name].qty += q;
+              dishMap[name].totalRev += price * q;
+            });
+          });
+          return Object.values(dishMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+        });
+
+        const paymentBreakdown = computed(() => {
+          const map = { Cash: 0, 'QR Pay': 0, Visa: 0, Master: 0, Debit: 0 };
+          rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
+            const method = o.pay_method || 'Cash';
+            map[method] = (map[method] || 0) + getLogTotal(o);
+          });
+          return map;
+        });
+
         const filteredLogs = computed(() => {
           return rawReportOrders.value.filter(o => {
             const q = searchLog.value.toLowerCase();
@@ -702,19 +769,21 @@
           const client = initSupabase();
 
           if (selectedPrinterId.value === 'pdf') {
-            // Virtual PDF Download/Print
             window.print();
             showReprintModal.value = false;
             return;
           }
 
-          // Determine target hardware IP
+          // Fetch selected printer details
           const targetPrinter = printerOptions.value.find(p => p.id === selectedPrinterId.value);
-          
+          const targetIp = targetPrinter ? targetPrinter.ip : '192.168.1.93';
+
+          // Insert into Supabase with direct printer_ip field
           await client.from('print_jobs').insert({
             job_type: 'REPRINT_RECEIPT',
             table_no: log.table_no,
-            printer_target_ip: targetPrinter ? targetPrinter.ip : '192.168.1.93',
+            printer_ip: targetIp,
+            printer_target_ip: targetIp,
             content: { 
               check_no: checkNo,
               items: log.items || [], 
@@ -727,7 +796,7 @@
           });
 
           showReprintModal.value = false;
-          alert(`Reprint Task sent to [${targetPrinter.name} (${targetPrinter.ip})] for ${checkNo}!`);
+          alert(`Reprint Task sent to [${targetPrinter.name} (${targetIp})] for ${checkNo}!`);
         };
 
         // EXPORT AUDIT REPORT DIRECTLY TO EXCEL (.CSV)
@@ -763,6 +832,7 @@
           const client = initSupabase();
           await client.from('print_jobs').insert({
             job_type: 'Z_REPORT',
+            printer_ip: '192.168.1.100',
             content: { range: `${startDate.value} to ${endDate.value}`, stats: reportStats.value }
           });
           window.print();
@@ -903,6 +973,7 @@
             await client.from('print_jobs').insert({
               job_type: 'CHECK',
               table_no: tableNo,
+              printer_ip: '192.168.1.100',
               content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo), pax: 1 }
             });
             alert(`Check printed for Table ${tableNo}`);
@@ -926,6 +997,7 @@
             await client.from('print_jobs').insert({
               job_type: 'RECEIPT',
               table_no: tableNo,
+              printer_ip: '192.168.1.100',
               content: { 
                 check_no: getTableCheckNo(tableNo),
                 items: getTableItems(tableNo), 
@@ -952,7 +1024,7 @@
 
         return {
           activeTab, isEditingItems, isEditLayout, dbTables, allOrders, menuList, selectedTable, loading,
-          reportPreset, startDate, endDate, searchLog, reportStats, filteredLogs,
+          reportPreset, startDate, endDate, searchLog, reportStats, top5Dishes, paymentBreakdown, filteredLogs,
           showReprintModal, targetReprintLog, selectedPrinterId, printerOptions,
           setReportPreset, switchToReports, fetchReportData, getLogSubtotal, getLogTotal, formatFullDateTime,
           openReprintModal, executeReprint, exportToCSV, printCurrentReport,
