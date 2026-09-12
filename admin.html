@@ -13,16 +13,31 @@
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
     <!-- Top Header Bar -->
-    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6">
+    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 flex-wrap gap-4">
       <div class="flex items-center space-x-3">
         <div class="bg-amber-500 text-white p-2 rounded-lg">
           <i class="fas fa-utensils text-xl"></i>
         </div>
         <div>
           <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
-          <p class="text-xs text-gray-500">Live Table & Order Monitor</p>
+          <p class="text-xs text-gray-500">Live Table & Menu Management</p>
         </div>
       </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex bg-gray-100 p-1 rounded-xl gap-1">
+        <button 
+          @click="activeTab = 'tables'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-th"></i> Floor Layout
+        </button>
+        <button 
+          @click="activeTab = 'menu'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-store-slash"></i> Sold Out Control
+        </button>
+      </div>
+
       <div class="flex items-center space-x-3">
         <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
           <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
@@ -30,8 +45,8 @@
       </div>
     </header>
 
-    <!-- Main Grid Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main View 1: Floor Layout / Tables View -->
+    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
       <!-- Left 2 Cols: Table Management -->
       <div class="lg:col-span-2 space-y-6">
@@ -97,17 +112,40 @@
               </button>
             </div>
 
-            <!-- Table Items List -->
-            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                <div class="flex-1">
-                  <p class="font-medium text-gray-800">{{ item.name }} x{{ item.qty }}</p>
-                  <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
+            <!-- Table Items List with Live Cooking/Served Status Toggle -->
+            <div class="space-y-3 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50">
+                <div class="flex justify-between items-start text-sm">
+                  <div class="flex-1">
+                    <p class="font-bold text-gray-800">{{ item.name }} x{{ item.qty }}</p>
+                    <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
+                    <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
-                    <i class="fas fa-trash"></i>
+
+                <!-- Status Switch Button (Pending -> Cooking -> Served) -->
+                <div class="mt-2 flex justify-between items-center pt-1 border-t border-gray-200/60 text-xs">
+                  <span class="text-gray-400">Status:</span>
+                  <button 
+                    @click="cycleItemStatus(item)" 
+                    :class="[
+                      'px-2 py-0.5 rounded text-[10px] font-bold transition flex items-center gap-1',
+                      (item.status || 'Pending') === 'Pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : '',
+                      (item.status || 'Pending') === 'Cooking' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' : '',
+                      (item.status || 'Pending') === 'Served' ? 'bg-green-100 text-green-800 hover:bg-green-200' : ''
+                    ]"
+                  >
+                    <i :class="[
+                      (item.status || 'Pending') === 'Pending' ? 'fas fa-clock' : '',
+                      (item.status || 'Pending') === 'Cooking' ? 'fas fa-fire' : '',
+                      (item.status || 'Pending') === 'Served' ? 'fas fa-check' : ''
+                    ]"></i>
+                    {{ item.status || 'Pending' }}
                   </button>
                 </div>
               </div>
@@ -155,7 +193,37 @@
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- Main View 2: Sold Out Control -->
+    <div v-if="activeTab === 'menu'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management
+        </h2>
+        <span class="text-xs text-gray-500">Changes reflect instantly on customer phones.</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div v-for="item in menuList" :key="item.id" class="p-3 border rounded-xl flex justify-between items-center bg-gray-50">
+          <div>
+            <p class="font-bold text-gray-800 text-sm">{{ item.name }}</p>
+            <p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p>
+          </div>
+
+          <!-- Sold Out Switch -->
+          <button 
+            @click="toggleSoldOut(item)"
+            :class="[
+              'px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1',
+              item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'
+            ]"
+          >
+            <i :class="item.is_sold_out ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+            {{ item.is_sold_out ? 'Sold Out' : 'Available' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Payment Modal -->
@@ -200,7 +268,7 @@
       </div>
     </div>
 
-    <!-- Password Modal (for Deleting Items / Voiding Order) -->
+    <!-- Password Modal -->
     <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -246,18 +314,20 @@
   <script>
     const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co";
     const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-    const STAFF_PIN = "1234"; // 默认 Staff 密码
+    const STAFF_PIN = "1234";
 
     const { createApp, ref, computed, onMounted } = Vue;
     let supabaseClient = null;
 
     createApp({
       setup() {
+        const activeTab = ref('tables'); // 'tables' or 'menu'
         const tables = ref([
           { id: 1, table_no: 'A01' }, { id: 2, table_no: 'A02' }, { id: 3, table_no: 'A03' }, { id: 4, table_no: 'A04' },
           { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
         ]);
         const allOrders = ref([]);
+        const menuList = ref([]);
         const selectedTable = ref(null);
         const loading = ref(false);
 
@@ -268,11 +338,11 @@
 
         const showPasswordModal = ref(false);
         const staffPassword = ref('');
-        const pendingAction = ref(null); // 'delete_item' or 'void_order'
+        const pendingAction = ref(null);
         const pendingItemTarget = ref(null);
 
         const showMoveModal = ref(false);
-        const moveType = ref('transfer'); // 'transfer' or 'join'
+        const moveType = ref('transfer');
         const targetTableNo = ref('');
 
         const initSupabase = () => {
@@ -284,9 +354,12 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
-            if (error) throw error;
-            allOrders.value = data || [];
+            const { data: ordersData, error: ordersErr } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            if (ordersErr) throw ordersErr;
+            allOrders.value = ordersData || [];
+
+            const { data: menuData, error: menuErr } = await client.from('menu').select('*').order('id', { ascending: true });
+            if (!menuErr && menuData) menuList.value = menuData;
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
           } finally {
@@ -298,10 +371,38 @@
           const client = initSupabase();
           client
             .channel('admin_realtime_orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-              fetchData();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'menu' }, () => fetchData())
             .subscribe();
+        };
+
+        // 一键开/关售罄 (Sold Out)
+        const toggleSoldOut = async (item) => {
+          const client = initSupabase();
+          const newStatus = !item.is_sold_out;
+          item.is_sold_out = newStatus; // 本地优先响应 UI
+          await client.from('menu').update({ is_sold_out: newStatus }).eq('id', item.id);
+        };
+
+        // 切换菜品状态 (Pending -> Cooking -> Served)
+        const cycleItemStatus = async (item) => {
+          const statusFlow = ['Pending', 'Cooking', 'Served'];
+          const currentIdx = statusFlow.indexOf(item.status || 'Pending');
+          const nextStatus = statusFlow[(currentIdx + 1) % statusFlow.length];
+
+          const client = initSupabase();
+          const activeOrders = getTableOrders(selectedTable.value);
+
+          for (const order of activeOrders) {
+            if (order.items && order.items.some(i => i.name === item.name)) {
+              order.items.forEach(i => {
+                if (i.name === item.name) i.status = nextStatus;
+              });
+              await client.from('orders').update({ items: order.items }).eq('id', order.id);
+              break;
+            }
+          }
+          await fetchData();
         };
 
         const getTableOrders = (tableNo) => {
@@ -356,7 +457,7 @@
           selectedTable.value = tableNo;
         };
 
-        // --- 1. 删除单个菜品 & 删整单逻辑 ---
+        // 删除单个菜品 & 删整单
         const requestDeleteItem = (item) => {
           pendingAction.value = 'delete_item';
           pendingItemTarget.value = item;
@@ -386,7 +487,6 @@
             alert(`Order for Table ${selectedTable.value} has been voided.`);
           } else if (pendingAction.value === 'delete_item') {
             const target = pendingItemTarget.value;
-            // 找到包含该菜品的 order 并移除
             for (const order of activeOrders) {
               if (order.items && order.items.some(i => i.name === target.name)) {
                 const updatedItems = order.items.filter(i => i !== target);
@@ -402,7 +502,7 @@
           }
         };
 
-        // --- 2. 换桌 & 合单逻辑 ---
+        // 换桌 & 合单逻辑
         const openMoveModal = (type) => {
           moveType.value = type;
           const firstAvail = availableTargetTables.value[0];
@@ -423,7 +523,7 @@
           alert(`Table successfully updated to ${targetTableNo.value}!`);
         };
 
-        // --- 3. 结账逻辑 ---
+        // 结账逻辑
         const printCheckReceipt = async (tableNo) => {
           try {
             const activeOrders = getTableOrders(tableNo);
@@ -499,8 +599,10 @@
         });
 
         return {
+          activeTab,
           tables,
           allOrders,
+          menuList,
           selectedTable,
           loading,
           showPaymentModal,
@@ -515,6 +617,8 @@
           targetTableNo,
           availableTargetTables,
           fetchData,
+          toggleSoldOut,
+          cycleItemStatus,
           getTableStatus,
           getTableCheckNo,
           getTableItems,
