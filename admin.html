@@ -57,6 +57,11 @@
           :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
           <i class="fas fa-store-slash"></i> Sold Out Control
         </button>
+        <button 
+          @click="switchToReports" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-chart-line"></i> View Reports
+        </button>
       </div>
 
       <div class="flex items-center space-x-3">
@@ -112,7 +117,6 @@
                 !isEditLayout && getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : ''
               ]"
             >
-              <!-- Normal View Mode -->
               <template v-if="!isEditLayout">
                 <div class="flex justify-between items-start w-full" :class="table.shape === 'circle' ? 'flex-col items-center gap-1' : ''">
                   <span class="font-bold text-sm text-gray-800">T-{{ table.table_no }}</span>
@@ -132,20 +136,17 @@
                 </div>
               </template>
 
-              <!-- Layout Editing Mode -->
               <template v-else>
                 <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">
                   T-{{ table.table_no }}
                 </div>
 
-                <!-- Shape Switchers -->
                 <div class="flex justify-center gap-1 z-10 my-1">
                   <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">S</button>
                   <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">R</button>
                   <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">C</button>
                 </div>
 
-                <!-- Resize Handle (支持圆桌与方桌自由拉伸) -->
                 <div class="resize-handle" @mousedown.stop.prevent="startResize(table, $event)">
                   <i class="fas fa-compress-alt text-[8px]"></i>
                 </div>
@@ -169,7 +170,6 @@
               </button>
             </div>
 
-            <!-- Transfer & Join Actions -->
             <div v-if="getTableItems(selectedTable).length > 0" class="flex gap-2">
               <button @click="openMoveModal('transfer')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
                 <i class="fas fa-exchange-alt"></i> Transfer
@@ -179,7 +179,6 @@
               </button>
             </div>
 
-            <!-- Table Items List -->
             <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
               <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50/50 space-y-1">
                 <div class="flex justify-between items-start text-sm">
@@ -191,9 +190,7 @@
                   <span class="font-bold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
                 </div>
 
-                <!-- Status & Intelligent Item Action (Delete Icon / Qty Adjust) -->
                 <div class="flex justify-between items-center pt-1 border-t border-gray-100 text-xs">
-                  <!-- Kitchen Status Tag -->
                   <span :class="[
                     'px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1',
                     item.status === 'Served' ? 'bg-green-100 text-green-700' :
@@ -207,14 +204,10 @@
                     {{ item.status || 'Pending' }}
                   </span>
 
-                  <!-- Delete / Qty Controls in Edit Mode -->
                   <div v-if="isEditingItems" class="flex items-center gap-1.5">
-                    <!-- 仅有 1 份：显示单条垃圾桶删除按钮 -->
-                    <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center transition" title="Delete Item">
+                    <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center transition">
                       <i class="fas fa-trash-alt text-xs"></i>
                     </button>
-
-                    <!-- 多于 1 份：显示 - / + 控件 -->
                     <template v-else>
                       <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded flex items-center justify-center">-</button>
                       <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
@@ -232,7 +225,6 @@
               </div>
             </div>
 
-            <!-- Manage Mode Toggle Button -->
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
               <button 
                 @click="isEditingItems = !isEditingItems" 
@@ -242,7 +234,6 @@
               </button>
             </div>
 
-            <!-- Bill Calculations -->
             <div v-if="getTableItems(selectedTable).length > 0" class="border-t pt-3 space-y-1.5 text-sm">
               <div class="flex justify-between text-gray-500">
                 <span>Subtotal</span>
@@ -258,7 +249,6 @@
               </div>
             </div>
 
-            <!-- Action Buttons -->
             <div v-if="getTableItems(selectedTable).length > 0" class="space-y-2 pt-2">
               <div class="grid grid-cols-2 gap-3">
                 <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
@@ -310,6 +300,181 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- TAB 3: ALL-IN-ONE REPORTS & ANALYTICS VIEW -->
+    <div v-if="activeTab === 'reports'" class="space-y-6">
+      
+      <!-- Date Filter Bar -->
+      <div class="bg-white p-4 rounded-xl shadow-sm flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-chart-pie text-amber-500"></i> Business Analytics & Sales Reports
+          </h2>
+          <p class="text-xs text-gray-500">Real-time revenue metrics & performance insight</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button 
+            v-for="period in ['today', 'yesterday', 'week', 'month']" 
+            :key="period"
+            @click="reportPeriod = period; fetchReportData()"
+            :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition capitalize', reportPeriod === period ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']"
+          >
+            {{ period }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Key Financial Metrics KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+          <div class="flex justify-between items-center text-gray-500 mb-1">
+            <span class="text-xs font-semibold uppercase">Total Revenue</span>
+            <i class="fas fa-dollar-sign text-green-500"></i>
+          </div>
+          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
+          <span class="text-[10px] text-gray-400">Completed Paid Orders</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+          <div class="flex justify-between items-center text-gray-500 mb-1">
+            <span class="text-xs font-semibold uppercase">Total Paid Orders</span>
+            <i class="fas fa-receipt text-blue-500"></i>
+          </div>
+          <p class="text-2xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
+          <span class="text-[10px] text-gray-400">Tables Served</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+          <div class="flex justify-between items-center text-gray-500 mb-1">
+            <span class="text-xs font-semibold uppercase">Avg Transaction (ATV)</span>
+            <i class="fas fa-calculator text-purple-500"></i>
+          </div>
+          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.avgTicket.toFixed(2) }}</p>
+          <span class="text-[10px] text-gray-400">Per Table Spend</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
+          <div class="flex justify-between items-center text-gray-500 mb-1">
+            <span class="text-xs font-semibold uppercase">Voided / Cancelled</span>
+            <i class="fas fa-ban text-red-500"></i>
+          </div>
+          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
+          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Voided Tickets</span>
+        </div>
+      </div>
+
+      <!-- Charts & Breakdowns Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Payment Methods Breakdown -->
+        <div class="bg-white p-5 rounded-xl shadow-sm space-y-3">
+          <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
+            <span>Payment Breakdown</span>
+            <i class="fas fa-wallet text-gray-400"></i>
+          </h3>
+          <div class="space-y-2">
+            <div v-for="(amount, method) in reportStats.payMethods" :key="method" class="space-y-1">
+              <div class="flex justify-between text-xs font-semibold">
+                <span class="text-gray-700">{{ method }}</span>
+                <span class="text-gray-900">RM {{ amount.toFixed(2) }} ({{ getPayPercentage(amount) }}%)</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-amber-500 h-2 rounded-full" :style="{ width: getPayPercentage(amount) + '%' }"></div>
+              </div>
+            </div>
+            <div v-if="Object.keys(reportStats.payMethods).length === 0" class="text-center py-6 text-xs text-gray-400">
+              No sales data recorded yet.
+            </div>
+          </div>
+        </div>
+
+        <!-- Hourly Peak Sales Trend -->
+        <div class="bg-white p-5 rounded-xl shadow-sm space-y-3 lg:col-span-2">
+          <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
+            <span>Hourly Sales Peak Trend</span>
+            <i class="fas fa-chart-bar text-gray-400"></i>
+          </h3>
+          
+          <div class="flex items-end justify-between gap-2 h-40 pt-4 px-2 border-b border-gray-100">
+            <div v-for="(sales, hourStr) in reportStats.hourlySales" :key="hourStr" class="flex-1 flex flex-col items-center gap-1">
+              <span class="text-[9px] font-bold text-amber-600">RM {{ sales > 0 ? sales.toFixed(0) : '' }}</span>
+              <div class="w-full bg-amber-100 rounded-t hover:bg-amber-400 transition" :style="{ height: getHourlyHeight(sales) + '%' }"></div>
+              <span class="text-[9px] text-gray-500 font-medium">{{ hourStr }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Top 5 Selling Items & Order History Log -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Top 5 Best Sellers -->
+        <div class="bg-white p-5 rounded-xl shadow-sm space-y-3">
+          <h3 class="text-md font-bold text-gray-800 border-b pb-2 flex items-center justify-between">
+            <span>Top 5 Best Selling Items</span>
+            <i class="fas fa-fire text-amber-500"></i>
+          </h3>
+
+          <div class="space-y-3">
+            <div v-for="(item, idx) in reportStats.topItems" :key="idx" class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span :class="['w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]', idx === 0 ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600']">
+                  {{ idx + 1 }}
+                </span>
+                <div>
+                  <p class="font-bold text-gray-800">{{ item.name }}</p>
+                  <p class="text-[10px] text-gray-400">Sold: {{ item.qty }} qty</p>
+                </div>
+              </div>
+              <span class="font-bold text-amber-600">RM {{ item.total.toFixed(2) }}</span>
+            </div>
+            <div v-if="reportStats.topItems.length === 0" class="text-center py-6 text-xs text-gray-400">
+              No items sold in this period.
+            </div>
+          </div>
+        </div>
+
+        <!-- Paid Transactions Log -->
+        <div class="bg-white p-5 rounded-xl shadow-sm space-y-3 lg:col-span-2">
+          <div class="flex justify-between items-center border-b pb-2">
+            <h3 class="text-md font-bold text-gray-800 flex items-center gap-2">
+              <i class="fas fa-list text-gray-500"></i> Completed Transactions Log
+            </h3>
+            <input type="text" v-model="searchLog" placeholder="Search Check# / Table" class="px-2.5 py-1 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500" />
+          </div>
+
+          <div class="overflow-x-auto max-h-60">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-gray-50 text-gray-500 font-semibold border-b">
+                  <th class="p-2">Check #</th>
+                  <th class="p-2">Table</th>
+                  <th class="p-2">Payment Method</th>
+                  <th class="p-2">Time</th>
+                  <th class="p-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr v-for="log in filteredLogs" :key="log.id" class="hover:bg-gray-50/50">
+                  <td class="p-2 font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</td>
+                  <td class="p-2 font-semibold">T-{{ log.table_no }}</td>
+                  <td class="p-2"><span class="px-2 py-0.5 bg-gray-100 rounded font-semibold">{{ log.pay_method || 'Cash' }}</span></td>
+                  <td class="p-2 text-gray-400">{{ formatTime(log.created_at) }}</td>
+                  <td class="p-2 font-bold text-right text-gray-800">RM {{ getLogTotal(log).toFixed(2) }}</td>
+                </tr>
+                <tr v-if="filteredLogs.length === 0">
+                  <td colspan="5" class="text-center py-6 text-gray-400">No transaction records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
     </div>
 
     <!-- Payment Modal -->
@@ -427,6 +592,21 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
+        // Reports Data State
+        const reportPeriod = ref('today');
+        const searchLog = ref('');
+        const rawReportOrders = ref([]);
+        const reportStats = ref({
+          totalRevenue: 0,
+          totalOrders: 0,
+          avgTicket: 0,
+          voidTotal: 0,
+          voidCount: 0,
+          payMethods: {},
+          topItems: [],
+          hourlySales: {}
+        });
+
         // Drag & Resize state
         let draggingTable = null;
         let resizingTable = null;
@@ -457,6 +637,7 @@
             .channel('admin_realtime_orders')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
               fetchData();
+              if (activeTab.value === 'reports') fetchReportData();
             })
             .subscribe();
         };
@@ -489,6 +670,122 @@
           } finally {
             loading.value = false;
           }
+        };
+
+        const switchToReports = () => {
+          activeTab.value = 'reports';
+          fetchReportData();
+        };
+
+        // Fetch & Calculate Full Business Analytics
+        const fetchReportData = async () => {
+          const client = initSupabase();
+          const { data: ordersData } = await client.from('orders').select('*');
+          if (!ordersData) return;
+
+          rawReportOrders.value = ordersData;
+
+          // Filter by Time Period
+          const now = new Date();
+          let filtered = ordersData.filter(o => {
+            if (!o.created_at) return true;
+            const d = new Date(o.created_at);
+            if (reportPeriod.value === 'today') return d.toDateString() === now.toDateString();
+            if (reportPeriod.value === 'yesterday') {
+              const y = new Date(); y.setDate(y.getDate() - 1);
+              return d.toDateString() === y.toDateString();
+            }
+            if (reportPeriod.value === 'week') {
+              const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+              return d >= weekAgo;
+            }
+            if (reportPeriod.value === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            return true;
+          });
+
+          // Metrics Calculation
+          let rev = 0, count = 0, voidAmt = 0, voidCnt = 0;
+          let payMap = {};
+          let itemMap = {};
+          let hours = { '10-12': 0, '12-14': 0, '14-16': 0, '16-18': 0, '18-20': 0, '20-22': 0, '22+': 0 };
+
+          filtered.forEach(o => {
+            const total = getLogTotal(o);
+            if (o.status === 'Paid') {
+              rev += total;
+              count++;
+
+              const m = o.pay_method || 'Cash';
+              payMap[m] = (payMap[m] || 0) + total;
+
+              // Top Items Aggregation
+              if (o.items && Array.isArray(o.items)) {
+                o.items.forEach(i => {
+                  if (!itemMap[i.name]) itemMap[i.name] = { name: i.name, qty: 0, total: 0 };
+                  itemMap[i.name].qty += Number(i.qty || 1);
+                  itemMap[i.name].total += Number(i.price || 0) * Number(i.qty || 1) * 1.10;
+                });
+              }
+
+              // Peak Hour Sales Calculation
+              if (o.created_at) {
+                const h = new Date(o.created_at).getHours();
+                if (h < 12) hours['10-12'] += total;
+                else if (h < 14) hours['12-14'] += total;
+                else if (h < 16) hours['14-16'] += total;
+                else if (h < 18) hours['16-18'] += total;
+                else if (h < 20) hours['18-20'] += total;
+                else if (h < 22) hours['20-22'] += total;
+                else hours['22+'] += total;
+              }
+            } else if (o.status === 'Void') {
+              voidAmt += total;
+              voidCnt++;
+            }
+          });
+
+          const sortedTop = Object.values(itemMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+
+          reportStats.value = {
+            totalRevenue: rev,
+            totalOrders: count,
+            avgTicket: count > 0 ? rev / count : 0,
+            voidTotal: voidAmt,
+            voidCount: voidCnt,
+            payMethods: payMap,
+            topItems: sortedTop,
+            hourlySales: hours
+          };
+        };
+
+        const getPayPercentage = (amt) => {
+          if (!reportStats.value.totalRevenue) return 0;
+          return Math.round((amt / reportStats.value.totalRevenue) * 100);
+        };
+
+        const getHourlyHeight = (sales) => {
+          const maxSales = Math.max(...Object.values(reportStats.value.hourlySales), 1);
+          return Math.min(100, Math.round((sales / maxSales) * 100));
+        };
+
+        const filteredLogs = computed(() => {
+          return rawReportOrders.value.filter(o => o.status === 'Paid' && (
+            !searchLog.value || 
+            (o.check_no && o.check_no.toLowerCase().includes(searchLog.value.toLowerCase())) ||
+            (o.table_no && o.table_no.toLowerCase().includes(searchLog.value.toLowerCase()))
+          )).slice(0, 30);
+        });
+
+        const getLogTotal = (o) => {
+          if (!o.items || !Array.isArray(o.items)) return 0;
+          const sub = o.items.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
+          return sub * 1.10;
+        };
+
+        const formatTime = (ts) => {
+          if (!ts) return '-';
+          const d = new Date(ts);
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
         const handleMouseDown = (table, e) => {
@@ -572,7 +869,7 @@
         };
 
         const getTableOrders = (tableNo) => {
-          return allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid');
+          return allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid' && o.status !== 'Void');
         };
 
         const getTableStatus = (tableNo) => {
@@ -671,7 +968,8 @@
 
           if (pendingAction.value === 'void_order') {
             const ids = activeOrders.map(o => o.id);
-            await client.from('orders').delete().in('id', ids);
+            // 标记为 Void 状态用于报表作废统计
+            await client.from('orders').update({ status: 'Void' }).in('id', ids);
             await fetchData();
             alert(`Order for Table ${selectedTable.value} has been voided.`);
           }
@@ -780,6 +1078,16 @@
           menuList,
           selectedTable,
           loading,
+          reportPeriod,
+          searchLog,
+          reportStats,
+          filteredLogs,
+          switchToReports,
+          fetchReportData,
+          getPayPercentage,
+          getHourlyHeight,
+          getLogTotal,
+          formatTime,
           showPaymentModal,
           selectedPayMethod,
           cashReceived,
