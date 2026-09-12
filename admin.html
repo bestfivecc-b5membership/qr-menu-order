@@ -12,8 +12,8 @@
 <body class="bg-gray-100 min-h-screen">
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
-    <!-- Top Header Bar (完全复原原始版本) -->
-    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6">
+    <!-- Top Header Bar -->
+    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 flex-wrap gap-4">
       <div class="flex items-center space-x-3">
         <div class="bg-amber-500 text-white p-2 rounded-lg">
           <i class="fas fa-utensils text-xl"></i>
@@ -23,6 +23,21 @@
           <p class="text-xs text-gray-500">Live Table & Order Monitor</p>
         </div>
       </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex bg-gray-100 p-1 rounded-xl gap-1">
+        <button 
+          @click="activeTab = 'tables'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-th"></i> Floor Layout
+        </button>
+        <button 
+          @click="activeTab = 'menu'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-store-slash"></i> Sold Out Control
+        </button>
+      </div>
+
       <div class="flex items-center space-x-3">
         <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
           <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
@@ -30,43 +45,67 @@
       </div>
     </header>
 
-    <!-- Main Grid Layout (完全复原原始版本) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- TAB 1: FLOOR LAYOUT VIEW -->
+    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- Left 2 Cols: Table Management -->
-      <div class="lg:col-span-2 space-y-6">
+      <!-- Left 2 Cols: Table Floor Plan Canvas -->
+      <div class="lg:col-span-2 space-y-4">
         <div class="bg-white p-5 rounded-xl shadow-sm">
-          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <i class="fas fa-th text-amber-500"></i> Floor Layout / Tables
-          </h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <i class="fas fa-th text-amber-500"></i> Floor Layout
+            </h2>
 
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <!-- Edit Layout Toggle & Save -->
+            <div class="flex items-center gap-2">
+              <button 
+                @click="isEditLayout = !isEditLayout" 
+                :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1', isEditLayout ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
+                <i class="fas" :class="isEditLayout ? 'fa-check' : 'fa-arrows-alt'"></i>
+                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Rearrange Tables' }}
+              </button>
+              <button v-if="isEditLayout" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 shadow transition flex items-center gap-1">
+                <i class="fas fa-save"></i> Save Layout
+              </button>
+            </div>
+          </div>
+
+          <!-- Free-Drag Canvas Arena -->
+          <div 
+            class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden" 
+            style="height: 500px;" 
+            @mousemove="handleMouseMove" 
+            @mouseup="handleMouseUp"
+          >
             <div 
-              v-for="table in tables" 
-              :key="table.id"
-              @click="selectTable(table.table_no)"
+              v-for="table in dbTables" 
+              :key="table.table_no"
+              @mousedown="handleMouseDown(table, $event)"
+              @click="!isEditLayout && selectTable(table.table_no)"
+              :style="{ left: table.pos_x + 'px', top: table.pos_y + 'px' }"
               :class="[
-                'p-4 rounded-xl cursor-pointer border-2 transition relative flex flex-col justify-between h-32',
-                selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-100',
-                getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-200' : 'bg-white hover:border-gray-300'
+                'absolute w-32 h-28 p-3 rounded-xl border-2 transition-shadow select-none flex flex-col justify-between',
+                isEditLayout ? 'cursor-move ring-2 ring-amber-400 bg-white shadow-lg' : 'cursor-pointer',
+                selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-200 bg-white',
+                !isEditLayout && getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : ''
               ]"
             >
               <div class="flex justify-between items-start">
-                <span class="font-bold text-lg text-gray-800">Table {{ table.table_no }}</span>
+                <span class="font-bold text-base text-gray-800">Table {{ table.table_no }}</span>
                 <span :class="[
-                  'px-2 py-0.5 text-xs font-semibold rounded-full',
+                  'px-1.5 py-0.5 text-[10px] font-semibold rounded-full',
                   getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
                 ]">
                   {{ getTableStatus(table.table_no) }}
                 </span>
               </div>
 
-              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-2">
-                <p class="text-xs text-gray-500">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
-                <p class="text-sm font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
+              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-1">
+                <p class="text-[10px] text-gray-500 truncate">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
+                <p class="text-xs font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
               </div>
-              <div v-else class="text-xs text-gray-400">
-                Ready for seating
+              <div v-else class="text-[10px] text-gray-400">
+                Ready
               </div>
             </div>
           </div>
@@ -97,7 +136,7 @@
               </button>
             </div>
 
-            <!-- Table Items List (保持原汁原味的列表排版) -->
+            <!-- Table Items List -->
             <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
               <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                 <div class="flex-1">
@@ -106,7 +145,8 @@
                 </div>
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
+                  <!-- 删除按钮只在开启 Edit 模式下显示 -->
+                  <button v-if="isEditingItems" @click="requestDeleteItem(item)" class="text-red-500 hover:text-red-700 text-xs p-1 bg-red-50 rounded">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -115,6 +155,16 @@
               <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">
                 No active order items on this table.
               </div>
+            </div>
+
+            <!-- 增加：修改/删除菜品的专有开关按钮 -->
+            <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
+              <button 
+                @click="isEditingItems = !isEditingItems" 
+                :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100']">
+                <i class="fas" :class="isEditingItems ? 'fa-check' : 'fa-edit'"></i>
+                {{ isEditingItems ? 'Done Modifying Items' : 'Manage / Delete Order Items' }}
+              </button>
             </div>
 
             <!-- Bill Calculations -->
@@ -155,7 +205,37 @@
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- TAB 2: SOLD OUT MANAGEMENT VIEW -->
+    <div v-if="activeTab === 'menu'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management
+        </h2>
+        <span class="text-xs text-gray-500">Changes reflect instantly on customer phones.</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div v-for="item in menuList" :key="item.id" class="p-3 border rounded-xl flex justify-between items-center bg-gray-50">
+          <div>
+            <p class="font-bold text-gray-800 text-sm">{{ item.name }}</p>
+            <p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p>
+          </div>
+
+          <!-- Sold Out Switch -->
+          <button 
+            @click="toggleSoldOut(item)"
+            :class="[
+              'px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1',
+              item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'
+            ]"
+          >
+            <i :class="item.is_sold_out ? 'fas fa-ban' : 'fas fa-check-circle'"></i>
+            {{ item.is_sold_out ? 'Sold Out' : 'Available' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Payment Modal -->
@@ -253,13 +333,30 @@
 
     createApp({
       setup() {
-        const tables = ref([
-          { id: 1, table_no: 'A01' }, { id: 2, table_no: 'A02' }, { id: 3, table_no: 'A03' }, { id: 4, table_no: 'A04' },
-          { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
+        const activeTab = ref('tables');
+        const isEditingItems = ref(false); // 控制菜品删除图标的显示
+        const isEditLayout = ref(false); // 控制桌号拉拽编辑
+
+        const dbTables = ref([
+          { table_no: 'A01', pos_x: 30, pos_y: 30 },
+          { table_no: 'A02', pos_x: 180, pos_y: 30 },
+          { table_no: 'A03', pos_x: 330, pos_y: 30 },
+          { table_no: 'A04', pos_x: 480, pos_y: 30 },
+          { table_no: 'B01', pos_x: 30, pos_y: 180 },
+          { table_no: 'B02', pos_x: 180, pos_y: 180 },
+          { table_no: 'B03', pos_x: 330, pos_y: 180 },
+          { table_no: 'B04', pos_x: 480, pos_y: 180 }
         ]);
+
         const allOrders = ref([]);
+        const menuList = ref([]);
         const selectedTable = ref(null);
         const loading = ref(false);
+
+        // Drag state
+        let draggingTable = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
 
         // Modals
         const showPaymentModal = ref(false);
@@ -284,9 +381,22 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
-            if (error) throw error;
-            allOrders.value = data || [];
+            const { data: ordersData } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            allOrders.value = ordersData || [];
+
+            const { data: menuData } = await client.from('menu').select('*').order('id', { ascending: true });
+            if (menuData) menuList.value = menuData;
+
+            const { data: layoutData } = await client.from('restaurant_tables').select('*');
+            if (layoutData && layoutData.length > 0) {
+              layoutData.forEach(t => {
+                const found = dbTables.value.find(x => x.table_no === t.table_no);
+                if (found) {
+                  found.pos_x = t.pos_x;
+                  found.pos_y = t.pos_y;
+                }
+              });
+            }
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
           } finally {
@@ -294,12 +404,39 @@
           }
         };
 
-        const subscribeRealtime = () => {
+        // --- Drag Table Logic ---
+        const handleMouseDown = (table, e) => {
+          if (!isEditLayout.value) return;
+          draggingTable = table;
+          dragOffsetX = e.clientX - table.pos_x;
+          dragOffsetY = e.clientY - table.pos_y;
+        };
+
+        const handleMouseMove = (e) => {
+          if (!draggingTable || !isEditLayout.value) return;
+          draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
+          draggingTable.pos_y = Math.max(0, Math.min(380, e.clientY - dragOffsetY));
+        };
+
+        const handleMouseUp = () => {
+          draggingTable = null;
+        };
+
+        const saveTablePositions = async () => {
           const client = initSupabase();
-          client
-            .channel('admin_realtime_orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
-            .subscribe();
+          for (const t of dbTables.value) {
+            await client.from('restaurant_tables').upsert({ table_no: t.table_no, pos_x: t.pos_x, pos_y: t.pos_y }, { onConflict: 'table_no' });
+          }
+          isEditLayout.value = false;
+          alert("Floor layout saved successfully!");
+        };
+
+        // 开关估清 (Sold Out)
+        const toggleSoldOut = async (item) => {
+          const client = initSupabase();
+          const newStatus = !item.is_sold_out;
+          item.is_sold_out = newStatus;
+          await client.from('menu').update({ is_sold_out: newStatus }).eq('id', item.id);
         };
 
         const getTableOrders = (tableNo) => {
@@ -347,14 +484,15 @@
         });
 
         const availableTargetTables = computed(() => {
-          return tables.value.filter(t => t.table_no !== selectedTable.value);
+          return dbTables.value.filter(t => t.table_no !== selectedTable.value);
         });
 
         const selectTable = (tableNo) => {
           selectedTable.value = tableNo;
+          isEditingItems.value = false;
         };
 
-        // 删除单个菜品 & 删整单
+        // 删除菜品与 Void Order
         const requestDeleteItem = (item) => {
           pendingAction.value = 'delete_item';
           pendingItemTarget.value = item;
@@ -399,7 +537,7 @@
           }
         };
 
-        // 换桌 & 合单逻辑
+        // 换桌 & 合单
         const openMoveModal = (type) => {
           moveType.value = type;
           const firstAvail = availableTargetTables.value[0];
@@ -492,12 +630,15 @@
 
         onMounted(() => {
           fetchData();
-          subscribeRealtime();
         });
 
         return {
-          tables,
+          activeTab,
+          isEditingItems,
+          isEditLayout,
+          dbTables,
           allOrders,
+          menuList,
           selectedTable,
           loading,
           showPaymentModal,
@@ -511,7 +652,12 @@
           moveType,
           targetTableNo,
           availableTargetTables,
+          handleMouseDown,
+          handleMouseMove,
+          handleMouseUp,
+          saveTablePositions,
           fetchData,
+          toggleSoldOut,
           getTableStatus,
           getTableCheckNo,
           getTableItems,
