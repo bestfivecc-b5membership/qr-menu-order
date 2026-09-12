@@ -12,18 +12,23 @@
     .circle-table { border-radius: 50% !important; }
     .resize-handle {
       position: absolute;
-      right: 2px;
-      bottom: 2px;
-      width: 14px;
-      height: 14px;
+      right: 0px;
+      bottom: 0px;
+      width: 18px;
+      height: 18px;
       cursor: se-resize;
       background: #f59e0b;
-      border-radius: 2px;
-      z-index: 20;
+      border-radius: 4px;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 10px;
     }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 min-h-screen select-none">
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
     <!-- Top Header Bar -->
@@ -72,7 +77,6 @@
               <i class="fas fa-th text-amber-500"></i> Floor Layout
             </h2>
 
-            <!-- Edit Layout Toggle & Save -->
             <div class="flex items-center gap-2">
               <button 
                 @click="isEditLayout = !isEditLayout" 
@@ -88,10 +92,11 @@
 
           <!-- Canvas Area -->
           <div 
-            class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden select-none" 
+            class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden" 
             style="height: 520px;" 
             @mousemove="handleMouseMove" 
             @mouseup="handleMouseUp"
+            @mouseleave="handleMouseUp"
           >
             <div 
               v-for="table in dbTables" 
@@ -101,15 +106,15 @@
               :style="{ left: table.pos_x + 'px', top: table.pos_y + 'px', width: table.width + 'px', height: table.height + 'px' }"
               :class="[
                 'absolute p-3 border-2 transition-all flex flex-col justify-between overflow-hidden',
-                table.shape === 'circle' ? 'circle-table items-center text-center' : 'rounded-xl',
+                table.shape === 'circle' ? 'circle-table items-center justify-center text-center' : 'rounded-xl',
                 isEditLayout ? 'cursor-move ring-2 ring-amber-400 bg-white shadow-lg' : 'cursor-pointer',
                 selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-200 bg-white',
                 !isEditLayout && getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : ''
               ]"
             >
-              <!-- Normal Layout -->
+              <!-- Normal View Mode -->
               <template v-if="!isEditLayout">
-                <div class="flex justify-between items-start w-full">
+                <div class="flex justify-between items-start w-full" :class="table.shape === 'circle' ? 'flex-col items-center gap-1' : ''">
                   <span class="font-bold text-sm text-gray-800">T-{{ table.table_no }}</span>
                   <span :class="[
                     'px-1.5 py-0.5 text-[9px] font-semibold rounded-full',
@@ -120,7 +125,6 @@
                 </div>
 
                 <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-1">
-                  <p class="text-[10px] text-gray-500 truncate">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
                   <p class="text-xs font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
                 </div>
                 <div v-else class="text-[10px] text-gray-400">
@@ -128,19 +132,23 @@
                 </div>
               </template>
 
-              <!-- Edit Mode Controls -->
+              <!-- Layout Editing Mode -->
               <template v-else>
                 <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">
                   T-{{ table.table_no }}
                 </div>
-                <!-- Controls for Shape Switch -->
+
+                <!-- Shape Switchers -->
                 <div class="flex justify-center gap-1 z-10 my-1">
-                  <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">S</button>
-                  <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">R</button>
-                  <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] bg-gray-200 rounded hover:bg-amber-400">C</button>
+                  <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">S</button>
+                  <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">R</button>
+                  <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">C</button>
                 </div>
-                <!-- Resize Handle (支持圆形自由放缩) -->
-                <div class="resize-handle" @mousedown.stop="startResize(table, $event)"></div>
+
+                <!-- Resize Handle (支持圆桌与方桌自由拉伸) -->
+                <div class="resize-handle" @mousedown.stop.prevent="startResize(table, $event)">
+                  <i class="fas fa-compress-alt text-[8px]"></i>
+                </div>
               </template>
             </div>
           </div>
@@ -171,7 +179,7 @@
               </button>
             </div>
 
-            <!-- Table Items List with Kitchen Cooking Status -->
+            <!-- Table Items List -->
             <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
               <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50/50 space-y-1">
                 <div class="flex justify-between items-start text-sm">
@@ -183,9 +191,9 @@
                   <span class="font-bold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
                 </div>
 
-                <!-- 菜品出餐状态 (Pending / Cooking / Served) 与 数量操作 -->
+                <!-- Status & Intelligent Item Action (Delete Icon / Qty Adjust) -->
                 <div class="flex justify-between items-center pt-1 border-t border-gray-100 text-xs">
-                  <!-- 状态展示标签 -->
+                  <!-- Kitchen Status Tag -->
                   <span :class="[
                     'px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1',
                     item.status === 'Served' ? 'bg-green-100 text-green-700' :
@@ -199,11 +207,19 @@
                     {{ item.status || 'Pending' }}
                   </span>
 
-                  <!-- 编辑模式下的 ＋ － 按钮 -->
-                  <div v-if="isEditingItems" class="flex items-center gap-1">
-                    <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded flex items-center justify-center">-</button>
-                    <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
-                    <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 hover:bg-green-200 text-green-700 font-bold rounded flex items-center justify-center">+</button>
+                  <!-- Delete / Qty Controls in Edit Mode -->
+                  <div v-if="isEditingItems" class="flex items-center gap-1.5">
+                    <!-- 如果只有 1 份：显示纯 Delete Icon 按钮直接删除 -->
+                    <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded flex items-center justify-center transition" title="Delete Item">
+                      <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+
+                    <!-- 如果多于 1 份：显示 - 减数量、+ 加数量 -->
+                    <template v-else>
+                      <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded flex items-center justify-center">-</button>
+                      <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
+                      <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 hover:bg-green-200 text-green-700 font-bold rounded flex items-center justify-center">+</button>
+                    </template>
                   </div>
                   <div v-else class="text-xs text-gray-500 font-semibold">
                     Qty: x{{ item.qty }}
@@ -216,13 +232,13 @@
               </div>
             </div>
 
-            <!-- 开关：显示管理与增减菜品按键 -->
+            <!-- Manage Mode Toggle Button -->
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
               <button 
                 @click="isEditingItems = !isEditingItems" 
                 :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100']">
                 <i class="fas" :class="isEditingItems ? 'fa-check' : 'fa-edit'"></i>
-                {{ isEditingItems ? 'Done Editing Items' : 'Manage Items (Add / Edit Qty)' }}
+                {{ isEditingItems ? 'Done Editing Items' : 'Manage / Delete Items' }}
               </button>
             </div>
 
@@ -396,14 +412,14 @@
         const isEditLayout = ref(false);
 
         const dbTables = ref([
-          { table_no: 'A01', pos_x: 30, pos_y: 30, width: 120, height: 100, shape: 'square' },
-          { table_no: 'A02', pos_x: 180, pos_y: 30, width: 120, height: 100, shape: 'square' },
-          { table_no: 'A03', pos_x: 330, pos_y: 30, width: 120, height: 100, shape: 'square' },
-          { table_no: 'A04', pos_x: 480, pos_y: 30, width: 120, height: 100, shape: 'square' },
-          { table_no: 'B01', pos_x: 30, pos_y: 180, width: 120, height: 100, shape: 'square' },
-          { table_no: 'B02', pos_x: 180, pos_y: 180, width: 120, height: 100, shape: 'square' },
-          { table_no: 'B03', pos_x: 330, pos_y: 180, width: 120, height: 100, shape: 'square' },
-          { table_no: 'B04', pos_x: 480, pos_y: 180, width: 120, height: 100, shape: 'square' }
+          { table_no: 'A01', pos_x: 30, pos_y: 30, width: 110, height: 100, shape: 'square' },
+          { table_no: 'A02', pos_x: 170, pos_y: 30, width: 110, height: 100, shape: 'square' },
+          { table_no: 'A03', pos_x: 310, pos_y: 30, width: 110, height: 100, shape: 'square' },
+          { table_no: 'A04', pos_x: 450, pos_y: 30, width: 110, height: 100, shape: 'square' },
+          { table_no: 'B01', pos_x: 30, pos_y: 170, width: 110, height: 100, shape: 'circle' },
+          { table_no: 'B02', pos_x: 170, pos_y: 170, width: 110, height: 100, shape: 'circle' },
+          { table_no: 'B03', pos_x: 310, pos_y: 170, width: 110, height: 100, shape: 'square' },
+          { table_no: 'B04', pos_x: 450, pos_y: 170, width: 110, height: 100, shape: 'square' }
         ]);
 
         const allOrders = ref([]);
@@ -411,7 +427,7 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Drag & Resize state
+        // Drag & Resize internal state
         let draggingTable = null;
         let resizingTable = null;
         let startX = 0, startY = 0, startW = 0, startH = 0;
@@ -435,14 +451,12 @@
           return supabaseClient;
         };
 
-        // --- 核心：配置 Supabase 实时推送 (Real-time Listener) ---
         const setupRealtimeSubscription = () => {
           const client = initSupabase();
           client
             .channel('admin_realtime_orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-              console.log("Realtime order update:", payload);
-              fetchData(); // 收到新订单/更新时，自动无感刷数据
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+              fetchData();
             })
             .subscribe();
         };
@@ -472,12 +486,12 @@
             }
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
-          } finally {
+          } font-bold {
             loading.value = false;
           }
         };
 
-        // --- Drag & Resize Logic ---
+        // Drag & Resize Handlers
         const handleMouseDown = (table, e) => {
           if (!isEditLayout.value) return;
           draggingTable = table;
@@ -495,20 +509,22 @@
 
         const handleMouseMove = (e) => {
           if (resizingTable) {
-            const newW = Math.max(70, startW + (e.clientX - startX));
-            const newH = Math.max(70, startH + (e.clientY - startY));
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
 
-            // 如果是圆形，保持宽高度同步缩放
             if (resizingTable.shape === 'circle') {
-              const size = Math.max(newW, newH);
-              resizingTable.width = size;
-              resizingTable.height = size;
+              // 圆形强制 width = height 同步等比例改变
+              const maxDelta = Math.max(deltaX, deltaY);
+              const newSize = Math.max(70, startW + maxDelta);
+              resizingTable.width = newSize;
+              resizingTable.height = newSize;
             } else {
-              resizingTable.width = newW;
-              resizingTable.height = newH;
+              resizingTable.width = Math.max(70, startW + deltaX);
+              resizingTable.height = Math.max(70, startH + deltaY);
             }
             return;
           }
+
           if (draggingTable && isEditLayout.value) {
             draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
             draggingTable.pos_y = Math.max(0, Math.min(400, e.clientY - dragOffsetY));
@@ -523,13 +539,13 @@
         const setShape = (table, type) => {
           table.shape = type;
           if (type === 'rect') {
-            table.width = 150;
+            table.width = 140;
             table.height = 90;
           } else if (type === 'circle') {
             table.width = 110;
             table.height = 110;
           } else {
-            table.width = 110;
+            table.width = 100;
             table.height = 100;
           }
         };
@@ -583,7 +599,12 @@
           return items;
         };
 
-        // 修改单品数量（增加或删减，减到0自动删除）
+        // 一键彻底删除 1 份菜品
+        const removeItem = async (targetItem) => {
+          await updateItemQty(targetItem, -targetItem.qty);
+        };
+
+        // 修改单品数量（增减与清理）
         const updateItemQty = async (targetItem, changeDelta) => {
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
@@ -617,8 +638,7 @@
         };
 
         const getTableTotal = (tableNo) => {
-          const sub = getTableSubtotal(tableNo);
-          return sub * 1.10;
+          return getTableSubtotal(tableNo) * 1.10;
         };
 
         const currentTableTotal = computed(() => {
@@ -752,7 +772,7 @@
 
         onMounted(() => {
           fetchData();
-          setupRealtimeSubscription(); // 开启实时进单订阅
+          setupRealtimeSubscription();
         });
 
         return {
@@ -786,6 +806,7 @@
           getTableStatus,
           getTableCheckNo,
           getTableItems,
+          removeItem,
           updateItemQty,
           getTableSubtotal,
           getTableTotal,
