@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>B5 Cuisine - Admin POS System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>B5 Cuisine - Mobile & Desktop POS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -20,64 +20,108 @@
       #printable-report, #printable-report * { visibility: visible; }
       #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
     }
+    /* 触摸屏优化 */
+    button, input, select { touch-action: manipulation; }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen select-none">
-  <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
+<body class="bg-gray-100 min-h-screen select-none pb-12">
+  <div id="app" class="p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
     
-    <!-- Top Header Bar -->
-    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 flex-wrap gap-4">
-      <div class="flex items-center space-x-3">
-        <div class="bg-amber-500 text-white p-2 rounded-lg">
-          <i class="fas fa-utensils text-xl"></i>
+    <!-- Top Header Bar (Responsive) -->
+    <header class="flex flex-col md:flex-row justify-between items-center bg-white p-3 sm:p-4 rounded-xl shadow-sm mb-4 sm:mb-6 gap-3">
+      <div class="flex items-center justify-between w-full md:w-auto">
+        <div class="flex items-center space-x-3">
+          <div class="bg-amber-500 text-white p-2 rounded-lg">
+            <i class="fas fa-utensils text-lg sm:text-xl"></i>
+          </div>
+          <div>
+            <h1 class="text-lg sm:text-xl font-bold text-gray-800">B5 Cuisine Admin</h1>
+            <p class="text-[10px] sm:text-xs text-green-600 flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> Live Connected
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
-          <p class="text-xs text-green-600 flex items-center gap-1">
-            <span class="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> Live Real-time Connected
-          </p>
-        </div>
-      </div>
-
-      <div class="flex bg-gray-100 p-1 rounded-xl gap-1">
-        <button @click="activeTab = 'tables'" :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-th"></i> Floor Layout
-        </button>
-        <button @click="activeTab = 'menu'" :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-store-slash"></i> Sold Out Control
-        </button>
-        <button @click="switchToReports" :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
-          <i class="fas fa-chart-line"></i> Full Ledger & Analytics
+        <button @click="fetchData" class="md:hidden p-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">
+          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i>
         </button>
       </div>
 
-      <div class="flex items-center space-x-3">
-        <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
-          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Sync Now
+      <!-- Navigation Tabs -->
+      <div class="grid grid-cols-3 w-full md:w-auto bg-gray-100 p-1 rounded-xl gap-1">
+        <button @click="activeTab = 'tables'" :class="['py-2 px-2 sm:px-4 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 sm:gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600']">
+          <i class="fas fa-th"></i> <span>Tables</span>
+        </button>
+        <button @click="activeTab = 'menu'" :class="['py-2 px-2 sm:px-4 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 sm:gap-2', activeTab === 'menu' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600']">
+          <i class="fas fa-store-slash"></i> <span>Sold Out</span>
+        </button>
+        <button @click="switchToReports" :class="['py-2 px-2 sm:px-4 text-xs font-bold rounded-lg transition flex items-center justify-center gap-1 sm:gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600']">
+          <i class="fas fa-chart-line"></i> <span>Reports</span>
         </button>
       </div>
+
+      <button @click="fetchData" class="hidden md:flex px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition items-center gap-2">
+        <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Sync Now
+      </button>
     </header>
 
     <!-- TAB 1: FLOOR LAYOUT VIEW -->
-    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+      
       <div class="lg:col-span-2 space-y-4">
-        <div class="bg-white p-5 rounded-xl shadow-sm">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-th text-amber-500"></i> Floor Layout
+        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm">
+          <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h2 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+              <i class="fas fa-th text-amber-500"></i> Tables Floor Layout
             </h2>
+            
             <div class="flex items-center gap-2">
-              <button @click="isEditLayout = !isEditLayout" :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1', isEditLayout ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']">
+              <!-- Mobile/Desktop View Switcher -->
+              <div class="flex bg-gray-100 p-1 rounded-lg text-xs">
+                <button @click="tableViewMode = 'grid'" :class="['px-2 py-1 rounded font-bold', tableViewMode === 'grid' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500']">
+                  <i class="fas fa-th-large"></i> Cards
+                </button>
+                <button @click="tableViewMode = 'canvas'" :class="['px-2 py-1 rounded font-bold', tableViewMode === 'canvas' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500']">
+                  <i class="fas fa-map"></i> 2D Map
+                </button>
+              </div>
+
+              <button v-if="tableViewMode === 'canvas'" @click="isEditLayout = !isEditLayout" :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1', isEditLayout ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-100 text-gray-700']">
                 <i class="fas" :class="isEditLayout ? 'fa-check' : 'fa-arrows-alt'"></i>
-                {{ isEditLayout ? 'Done Rearranging' : 'Drag & Resize Tables' }}
+                <span class="hidden sm:inline">{{ isEditLayout ? 'Done' : 'Edit Layout' }}</span>
               </button>
-              <button v-if="isEditLayout" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 shadow transition flex items-center gap-1">
-                <i class="fas fa-save"></i> Save Layout
+              <button v-if="isEditLayout && tableViewMode === 'canvas'" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white shadow">
+                Save
               </button>
             </div>
           </div>
 
-          <div class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-hidden" style="height: 520px;" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp">
+          <!-- MODE A: MOBILE-FRIENDLY GRID CARDS (默认手机极其好用) -->
+          <div v-if="tableViewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div 
+              v-for="table in dbTables" :key="table.table_no"
+              @click="selectTable(table.table_no)"
+              :class="[
+                'p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between h-28',
+                selectedTable === table.table_no ? 'border-amber-500 ring-2 ring-amber-300 bg-amber-50/20' : 'border-gray-200 bg-white',
+                getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-300' : 'hover:border-amber-200'
+              ]"
+            >
+              <div class="flex justify-between items-start">
+                <span class="font-bold text-base text-gray-800">T-{{ table.table_no }}</span>
+                <span :class="['px-2 py-0.5 text-[10px] font-bold rounded-full', getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800']">
+                  {{ getTableStatus(table.table_no) }}
+                </span>
+              </div>
+              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-2">
+                <p class="text-xs text-gray-500">Total Due:</p>
+                <p class="text-sm font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
+              </div>
+              <div v-else class="text-xs text-gray-400 mt-2">Available</div>
+            </div>
+          </div>
+
+          <!-- MODE B: DESKTOP 2D CANVAS LAYOUT -->
+          <div v-else class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-auto" style="height: 480px;" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp">
             <div 
               v-for="table in dbTables" :key="table.table_no"
               @mousedown="handleMouseDown(table, $event)"
@@ -106,9 +150,9 @@
               <template v-else>
                 <div class="text-center font-bold text-xs text-gray-800 pointer-events-none">T-{{ table.table_no }}</div>
                 <div class="flex justify-center gap-1 z-10 my-1">
-                  <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">S</button>
-                  <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">R</button>
-                  <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] font-bold bg-gray-200 rounded hover:bg-amber-400">C</button>
+                  <button @click.stop="setShape(table, 'square')" class="px-1 text-[9px] font-bold bg-gray-200 rounded">S</button>
+                  <button @click.stop="setShape(table, 'rect')" class="px-1 text-[9px] font-bold bg-gray-200 rounded">R</button>
+                  <button @click.stop="setShape(table, 'circle')" class="px-1 text-[9px] font-bold bg-gray-200 rounded">C</button>
                 </div>
                 <div class="resize-handle" @mousedown.stop.prevent="startResize(table, $event)">
                   <i class="fas fa-compress-alt text-[8px]"></i>
@@ -119,25 +163,25 @@
         </div>
       </div>
 
-      <!-- Right Col: Table Detail -->
+      <!-- Right/Bottom Col: Table Detail Panel -->
       <div class="space-y-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm sticky top-6">
+        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm">
           <div v-if="selectedTable" class="space-y-4">
             <div class="flex justify-between items-center border-b pb-3">
               <div>
                 <h3 class="text-xl font-bold text-gray-800">Table {{ selectedTable }}</h3>
                 <p class="text-xs text-gray-500">Check#: <span class="font-bold text-amber-600">{{ getTableCheckNo(selectedTable) }}</span></p>
               </div>
-              <button @click="selectedTable = null" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+              <button @click="selectedTable = null" class="p-2 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
             </div>
 
             <div v-if="getTableItems(selectedTable).length > 0" class="flex gap-2">
-              <button @click="openMoveModal('transfer')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1"><i class="fas fa-exchange-alt"></i> Transfer</button>
-              <button @click="openMoveModal('join')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1"><i class="fas fa-object-group"></i> Join Table</button>
+              <button @click="openMoveModal('transfer')" class="flex-1 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg flex items-center justify-center gap-1"><i class="fas fa-exchange-alt"></i> Transfer</button>
+              <button @click="openMoveModal('join')" class="flex-1 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg flex items-center justify-center gap-1"><i class="fas fa-object-group"></i> Join Table</button>
             </div>
 
-            <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
-              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2 border border-gray-100 rounded-lg bg-gray-50/50 space-y-1">
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="p-2.5 border border-gray-100 rounded-lg bg-gray-50 space-y-1">
                 <div class="flex justify-between items-start text-sm">
                   <div class="flex-1 pr-2">
                     <p class="font-bold text-gray-800">{{ item.name }}</p>
@@ -146,25 +190,25 @@
                   <span class="font-bold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
                 </div>
                 <div class="flex justify-between items-center pt-1 border-t border-gray-100 text-xs">
-                  <span :class="['px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1', item.status === 'Served' ? 'bg-green-100 text-green-700' : item.status === 'Cooking' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-800']">
+                  <span :class="['px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1', item.status === 'Served' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800']">
                     {{ item.status || 'Pending' }}
                   </span>
-                  <div v-if="isEditingItems" class="flex items-center gap-1.5">
+                  <div v-if="isEditingItems" class="flex items-center gap-2">
                     <button v-if="item.qty === 1" @click="removeItem(item)" class="p-1.5 bg-red-100 text-red-600 rounded"><i class="fas fa-trash-alt text-xs"></i></button>
                     <template v-else>
-                      <button @click="updateItemQty(item, -1)" class="w-6 h-6 bg-amber-100 text-amber-800 font-bold rounded">-</button>
+                      <button @click="updateItemQty(item, -1)" class="w-7 h-7 bg-amber-100 text-amber-800 font-bold rounded text-base">-</button>
                       <span class="w-6 text-center font-bold text-sm">{{ item.qty }}</span>
-                      <button @click="updateItemQty(item, 1)" class="w-6 h-6 bg-green-100 text-green-700 font-bold rounded">+</button>
+                      <button @click="updateItemQty(item, 1)" class="w-7 h-7 bg-green-100 text-green-700 font-bold rounded text-base">+</button>
                     </template>
                   </div>
                   <div v-else class="text-xs text-gray-500 font-semibold">Qty: x{{ item.qty }}</div>
                 </div>
               </div>
-              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">No active order items on this table.</div>
+              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-6 text-gray-400 text-sm">No active order items on this table.</div>
             </div>
 
             <div v-if="getTableItems(selectedTable).length > 0" class="pt-1">
-              <button @click="isEditingItems = !isEditingItems" :class="['w-full py-1.5 text-xs font-bold rounded-lg border transition flex items-center justify-center gap-1', isEditingItems ? 'bg-amber-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100']">
+              <button @click="isEditingItems = !isEditingItems" :class="['w-full py-2 text-xs font-bold rounded-lg border transition', isEditingItems ? 'bg-amber-500 text-white' : 'bg-gray-50 text-gray-600']">
                 {{ isEditingItems ? 'Done Editing Items' : 'Manage / Delete Items' }}
               </button>
             </div>
@@ -177,144 +221,112 @@
 
             <div v-if="getTableItems(selectedTable).length > 0" class="space-y-2 pt-2">
               <div class="grid grid-cols-2 gap-3">
-                <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm flex items-center justify-center gap-2"><i class="fas fa-print"></i> Print Check</button>
-                <button @click="openPaymentModal(selectedTable)" class="py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg text-sm flex items-center justify-center gap-2"><i class="fas fa-cash-register"></i> Checkout</button>
+                <button @click="printCheckReceipt(selectedTable)" class="py-3 bg-blue-600 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"><i class="fas fa-print"></i> Print Check</button>
+                <button @click="openPaymentModal(selectedTable)" class="py-3 bg-green-600 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"><i class="fas fa-cash-register"></i> Checkout</button>
               </div>
-              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 text-red-600 font-semibold rounded-lg text-xs flex items-center justify-center gap-1 border border-red-200"><i class="fas fa-ban"></i> Void Entire Order</button>
+              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 text-red-600 font-bold rounded-lg text-xs border border-red-200">Void Entire Order</button>
             </div>
           </div>
-          <div v-else class="text-center py-12 text-gray-400"><i class="fas fa-mouse-pointer text-3xl mb-2 text-gray-300"></i><p>Select a table to manage order.</p></div>
+          <div v-else class="text-center py-8 text-gray-400"><i class="fas fa-hand-pointer text-2xl mb-2 text-gray-300"></i><p class="text-xs sm:text-sm">Tap any table to view or checkout.</p></div>
         </div>
       </div>
     </div>
 
     <!-- TAB 2: MENU SOLD OUT -->
-    <div v-if="activeTab === 'menu'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-store-slash text-red-500"></i> Menu Out of Stock / Sold Out Management</h2>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-if="activeTab === 'menu'" class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-4">
+      <h2 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2 border-b pb-3">
+        <i class="fas fa-store-slash text-red-500"></i> Out of Stock / Sold Out Management
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div v-for="item in menuList" :key="item.id" class="p-3 border rounded-xl flex justify-between items-center bg-gray-50">
           <div><p class="font-bold text-gray-800 text-sm">{{ item.name }}</p><p class="text-xs text-amber-600 font-semibold">RM {{ Number(item.price).toFixed(2) }}</p></div>
-          <button @click="toggleSoldOut(item)" :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition', item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800']">
+          <button @click="toggleSoldOut(item)" :class="['px-4 py-2 text-xs font-bold rounded-lg transition', item.is_sold_out ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800']">
             {{ item.is_sold_out ? 'Sold Out' : 'Available' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- TAB 3: REPORTS, ANALYTICS & EXCEL LEDGER (RECOMBINED & RESTORED) -->
-    <div v-if="activeTab === 'reports'" class="space-y-6">
+    <!-- TAB 3: REPORTS, ANALYTICS & EXCEL LEDGER -->
+    <div v-if="activeTab === 'reports'" class="space-y-4 sm:space-y-6">
       
-      <!-- Top Action Bar & Date Range Presets -->
-      <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
-        <div class="flex flex-wrap justify-between items-center gap-4 border-b pb-3">
-          <div>
-            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-chart-line text-amber-500"></i> Analytics & Detailed Excel Audit Ledger
-            </h2>
-            <p class="text-xs text-gray-500">Combined Top-seller insights and invoice-level granular ledger.</p>
-          </div>
-
+      <!-- Top Presets Bar -->
+      <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+        <div class="flex justify-between items-center border-b pb-2 flex-wrap gap-2">
+          <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-chart-line text-amber-500"></i> Ledger & Analytics
+          </h2>
           <div class="flex items-center gap-2">
-            <button @click="exportToCSV" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
-              <i class="fas fa-file-excel"></i> Export Excel (CSV)
+            <button @click="exportToCSV" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg flex items-center gap-1">
+              <i class="fas fa-file-excel"></i> CSV
             </button>
-            <button @click="printCurrentReport" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
-              <i class="fas fa-print"></i> Print Z-Report
+            <button @click="printCurrentReport" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center gap-1">
+              <i class="fas fa-print"></i> Z-Report
             </button>
           </div>
         </div>
 
-        <!-- Date Presets & Custom Selectors -->
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <button 
-              v-for="p in [
-                { id: 'today', label: 'Today' },
-                { id: 'yesterday', label: 'Yesterday' },
-                { id: 'week', label: 'This Week' },
-                { id: 'month', label: 'This Month' },
-                { id: 'year', label: 'Annual (This Year)' },
-                { id: 'all', label: 'All Time' }
-              ]" 
-              :key="p.id"
-              @click="setReportPreset(p.id)"
-              :class="['px-3 py-1.5 text-xs font-bold rounded-lg transition', reportPreset === p.id ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']"
-            >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-1 flex-wrap">
+            <button v-for="p in [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'week', label: 'Week' }, { id: 'month', label: 'Month' }, { id: 'all', label: 'All' }]" :key="p.id" @click="setReportPreset(p.id)" :class="['px-2.5 py-1 text-xs font-bold rounded-lg transition', reportPreset === p.id ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600']">
               {{ p.label }}
             </button>
           </div>
-
-          <div class="flex items-center gap-2 text-xs bg-gray-50 p-1.5 rounded-lg border">
-            <span class="font-semibold text-gray-500">Custom Range:</span>
-            <input type="date" v-model="startDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-2 py-1 outline-none font-semibold text-gray-700" />
-            <span class="text-gray-400">to</span>
-            <input type="date" v-model="endDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-2 py-1 outline-none font-semibold text-gray-700" />
+          <div class="flex items-center gap-1 text-xs bg-gray-50 p-1 rounded-lg border w-full sm:w-auto">
+            <input type="date" v-model="startDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-1.5 py-1 text-xs w-full sm:w-auto" />
+            <span>-</span>
+            <input type="date" v-model="endDate" @change="reportPreset = 'custom'; fetchReportData()" class="bg-white border rounded px-1.5 py-1 text-xs w-full sm:w-auto" />
           </div>
         </div>
       </div>
 
       <!-- KPI Overview Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Gross Revenue</span>
-          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">Paid Invoices Only</span>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Gross Rev</span>
+          <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Service Tax (10%)</span>
-          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.totalTax.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">Tax Collected</span>
+        <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Tax (10%)</span>
+          <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.totalTax.toFixed(2) }}</p>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Total Checks</span>
-          <p class="text-2xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
-          <span class="text-[10px] text-gray-400">Avg Ticket: RM {{ reportStats.avgTicket.toFixed(2) }}</span>
+        <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Checks</span>
+          <p class="text-lg sm:text-xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
-          <span class="text-xs font-semibold uppercase text-gray-500">Voided Amount</span>
-          <p class="text-2xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
-          <span class="text-[10px] text-gray-400">{{ reportStats.voidCount }} Voided Checks</span>
+        <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-red-500">
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Voided</span>
+          <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
         </div>
       </div>
 
-      <!-- RESTORED: ANALYTICS & TOP 5 DISHES SECTION -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Top 5 Dishes Ranking -->
-        <div class="bg-white p-5 rounded-xl shadow-sm lg:col-span-2 space-y-4">
-          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <i class="fas fa-trophy text-amber-500"></i> Top 5 Best-Selling Dishes (Quantity & Revenue)
+      <!-- TOP 5 DISHES & PAYMENT METHODS -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm lg:col-span-2 space-y-3">
+          <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+            <i class="fas fa-trophy text-amber-500"></i> Top 5 Best-Selling Dishes
           </h3>
-          <div class="space-y-3">
-            <div v-for="(item, idx) in top5Dishes" :key="idx" class="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-              <div class="flex items-center gap-3">
-                <span :class="['w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs', idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-gray-300 text-gray-700' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-gray-200 text-gray-600']">
-                  {{ idx + 1 }}
-                </span>
+          <div class="space-y-2">
+            <div v-for="(item, idx) in top5Dishes" :key="idx" class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs sm:text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full bg-amber-400 text-white flex items-center justify-center font-bold text-[10px]">{{ idx + 1 }}</span>
                 <div>
-                  <p class="font-bold text-sm text-gray-800">{{ item.name }}</p>
-                  <p class="text-xs text-gray-500">Sold: <strong class="text-amber-600">{{ item.qty }}</strong> portions</p>
+                  <p class="font-bold text-gray-800">{{ item.name }}</p>
+                  <p class="text-[10px] text-gray-500">Qty: {{ item.qty }}</p>
                 </div>
               </div>
-              <div class="text-right">
-                <p class="font-bold text-sm text-gray-800">RM {{ item.totalRev.toFixed(2) }}</p>
-                <div class="w-24 bg-gray-200 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div class="bg-amber-500 h-full" :style="{ width: (item.totalRev / (top5Dishes[0]?.totalRev || 1) * 100) + '%' }"></div>
-                </div>
-              </div>
+              <span class="font-bold text-gray-800">RM {{ item.totalRev.toFixed(2) }}</span>
             </div>
-            <div v-if="top5Dishes.length === 0" class="text-center py-6 text-gray-400 text-xs">No sales data for top dishes in this period.</div>
+            <div v-if="top5Dishes.length === 0" class="text-center py-4 text-gray-400 text-xs">No sales data.</div>
           </div>
         </div>
 
-        <!-- Payment Methods Breakdown -->
-        <div class="bg-white p-5 rounded-xl shadow-sm space-y-4">
-          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-3">
+          <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
             <i class="fas fa-wallet text-amber-500"></i> Payment Distribution
           </h3>
-          <div class="space-y-3">
-            <div v-for="(val, method) in paymentBreakdown" :key="method" class="flex justify-between items-center p-2 border-b text-xs">
+          <div class="space-y-2">
+            <div v-for="(val, method) in paymentBreakdown" :key="method" class="flex justify-between items-center p-1.5 border-b text-xs">
               <span class="font-semibold text-gray-700">{{ method }}</span>
               <span class="font-mono font-bold text-gray-900">RM {{ val.toFixed(2) }}</span>
             </div>
@@ -322,213 +334,167 @@
         </div>
       </div>
 
-      <!-- ULTRA DETAILED INVOICE & ITEM LEDGER (EXCEL-STYLE) -->
-      <div class="bg-white p-5 rounded-xl shadow-sm space-y-4">
-        <div class="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
-          <div class="flex items-center gap-3">
-            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <i class="fas fa-list-alt text-amber-500"></i> Granular Invoice Ledger
-            </h3>
-            <span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
-              {{ filteredLogs.length }} Receipts
-            </span>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <input type="text" v-model="searchLog" placeholder="Search Check#, Table, Item..." class="px-3 py-1.5 border rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500 w-64" />
-          </div>
+      <!-- INVOICE LEDGER TABLE (RESPONSIVE DESKTOP TABLE / MOBILE CARDS) -->
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
+          <h3 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-list-alt text-amber-500"></i> Invoices Log ({{ filteredLogs.length }})
+          </h3>
+          <input type="text" v-model="searchLog" placeholder="Search Check#, Table..." class="px-3 py-1.5 border rounded-lg text-xs outline-none w-full sm:w-64" />
         </div>
 
-        <!-- Excel Style Data Table -->
-        <div class="overflow-x-auto border rounded-xl">
+        <!-- Desktop Table View -->
+        <div class="hidden md:block overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
-                <th class="p-3 border-r">Date & Time</th>
+                <th class="p-3 border-r">Date</th>
                 <th class="p-3 border-r">Check #</th>
                 <th class="p-3 border-r">Table</th>
                 <th class="p-3 border-r">Status</th>
                 <th class="p-3 border-r">Method</th>
-                <th class="p-3 border-r w-2/5">Itemized Line Items</th>
-                <th class="p-3 border-r text-right">Subtotal</th>
-                <th class="p-3 border-r text-right">Tax 10%</th>
-                <th class="p-3 border-r text-right font-bold text-black">Total</th>
+                <th class="p-3 border-r w-2/5">Line Items</th>
+                <th class="p-3 border-r text-right">Total</th>
                 <th class="p-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
               <tr v-for="log in filteredLogs" :key="log.id" :class="['hover:bg-amber-50/40 transition', log.status === 'Void' ? 'bg-red-50/40 text-red-700' : '']">
-                <td class="p-3 border-r font-mono whitespace-nowrap text-gray-600">{{ formatFullDateTime(log.created_at) }}</td>
-                <td class="p-3 border-r font-bold text-amber-600 whitespace-nowrap">{{ log.check_no || `CHK-${log.id}` }}</td>
-                <td class="p-3 border-r font-bold whitespace-nowrap">T-{{ log.table_no }}</td>
-                <td class="p-3 border-r whitespace-nowrap">
-                  <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">
-                    {{ log.status }}
-                  </span>
-                </td>
-                <td class="p-3 border-r font-semibold whitespace-nowrap">{{ log.pay_method || 'Cash' }}</td>
-                
+                <td class="p-3 border-r font-mono text-gray-600">{{ formatFullDateTime(log.created_at) }}</td>
+                <td class="p-3 border-r font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</td>
+                <td class="p-3 border-r font-bold">T-{{ log.table_no }}</td>
+                <td class="p-3 border-r"><span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span></td>
+                <td class="p-3 border-r font-semibold">{{ log.pay_method || 'Cash' }}</td>
                 <td class="p-3 border-r">
                   <div class="space-y-1">
                     <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded text-[11px]">
-                      <span class="font-medium text-gray-800">
-                        <strong class="text-amber-600">x{{ item.qty }}</strong> {{ item.name }}
-                        <span v-if="item.remark" class="text-[9px] text-gray-400 font-normal">({{ item.remark }})</span>
-                      </span>
+                      <span><strong class="text-amber-600">x{{ item.qty }}</strong> {{ item.name }}</span>
                       <span class="text-gray-500 font-mono">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
                     </div>
                   </div>
                 </td>
-
-                <td class="p-3 border-r text-right font-mono text-gray-600">RM {{ getLogSubtotal(log).toFixed(2) }}</td>
-                <td class="p-3 border-r text-right font-mono text-gray-500">RM {{ (getLogSubtotal(log) * 0.10).toFixed(2) }}</td>
-                <td class="p-3 border-r text-right font-mono font-bold text-gray-900 text-sm">RM {{ getLogTotal(log).toFixed(2) }}</td>
-                
-                <td class="p-3 text-center whitespace-nowrap">
-                  <button @click="openReprintModal(log)" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold shadow-sm transition text-xs flex items-center justify-center gap-1 mx-auto">
-                    <i class="fas fa-print"></i> Reprint
-                  </button>
+                <td class="p-3 border-r text-right font-mono font-bold text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</td>
+                <td class="p-3 text-center">
+                  <button @click="openReprintModal(log)" class="px-3 py-1 bg-amber-500 text-white rounded font-bold shadow-sm text-xs">Reprint</button>
                 </td>
-              </tr>
-              <tr v-if="filteredLogs.length === 0">
-                <td colspan="10" class="text-center py-12 text-gray-400">No matching detailed transaction entries for the selected time range.</td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
 
-    </div>
-
-    <!-- REPRINT PRINTER SELECTION MODAL (FIXED PRINTER ROUTING) -->
-    <div v-if="showReprintModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-        <div class="flex justify-between items-center border-b pb-2">
-          <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-print text-amber-500"></i> Select Output Printer / Channel
-          </h3>
-          <button @click="showReprintModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
-        </div>
-        
-        <p class="text-xs text-gray-500">
-          Target Invoice: <strong class="text-amber-600">{{ targetReprintLog?.check_no || `CHK-${targetReprintLog?.id}` }}</strong> (Table T-{{ targetReprintLog?.table_no }})
-        </p>
-
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-gray-700">Select Hardware Destination:</label>
-          <div class="space-y-2">
-            <label v-for="p in printerOptions" :key="p.id" :class="['flex items-center justify-between p-3 border rounded-xl cursor-pointer transition', selectedPrinterId === p.id ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' : 'bg-gray-50 hover:bg-gray-100']">
-              <div class="flex items-center gap-3">
-                <input type="radio" :value="p.id" v-model="selectedPrinterId" class="text-amber-500 focus:ring-amber-400" />
-                <div>
-                  <p class="font-bold text-sm text-gray-800">{{ p.name }}</p>
-                  <p class="text-[10px] text-gray-500 font-mono">IP: {{ p.ip }}</p>
-                </div>
+        <!-- Mobile Responsive Cards View -->
+        <div class="md:hidden space-y-3">
+          <div v-for="log in filteredLogs" :key="log.id" class="p-3 border rounded-xl space-y-2 bg-gray-50">
+            <div class="flex justify-between items-center border-b pb-2 text-xs">
+              <div>
+                <span class="font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</span>
+                <span class="font-bold ml-2">T-{{ log.table_no }}</span>
               </div>
-              <i :class="[p.icon, 'text-gray-400 text-lg']"></i>
-            </label>
+              <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span>
+            </div>
+            <div class="space-y-1 text-xs">
+              <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between">
+                <span class="text-gray-700">x{{ item.qty }} {{ item.name }}</span>
+                <span class="font-mono text-gray-500">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
+              </div>
+            </div>
+            <div class="flex justify-between items-center border-t pt-2 text-xs">
+              <span class="text-gray-500">{{ log.pay_method || 'Cash' }}</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</span>
+                <button @click="openReprintModal(log)" class="px-2.5 py-1 bg-amber-500 text-white rounded font-bold text-[11px]">Print</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="flex gap-3 pt-3">
-          <button @click="showReprintModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
-          <button @click="executeReprint" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm flex items-center justify-center gap-1">
-            <i class="fas fa-paper-plane"></i> Send Print Task
-          </button>
+      </div>
+
+    </div>
+
+    <!-- REPRINT PRINTER SELECTION MODAL -->
+    <div v-if="showReprintModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="text-base font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-print text-amber-500"></i> Select Output Printer</h3>
+          <button @click="showReprintModal = false" class="text-gray-400 p-1"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-xs text-gray-500">Invoice: <strong class="text-amber-600">{{ targetReprintLog?.check_no || `CHK-${targetReprintLog?.id}` }}</strong></p>
+        <div class="space-y-2">
+          <label v-for="p in printerOptions" :key="p.id" :class="['flex items-center justify-between p-3 border rounded-xl cursor-pointer transition', selectedPrinterId === p.id ? 'border-amber-500 bg-amber-50/50' : 'bg-gray-50']">
+            <div class="flex items-center gap-3">
+              <input type="radio" :value="p.id" v-model="selectedPrinterId" class="text-amber-500" />
+              <div>
+                <p class="font-bold text-xs sm:text-sm text-gray-800">{{ p.name }}</p>
+                <p class="text-[10px] text-gray-500 font-mono">IP: {{ p.ip }}</p>
+              </div>
+            </div>
+            <i :class="[p.icon, 'text-gray-400 text-base']"></i>
+          </label>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button @click="showReprintModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg text-xs">Cancel</button>
+          <button @click="executeReprint" class="flex-1 py-2.5 bg-amber-500 text-white font-bold rounded-lg text-xs shadow">Send Task</button>
         </div>
       </div>
     </div>
 
-    <!-- Hidden PDF Print View -->
-    <div id="printable-report" class="hidden print:block p-8">
-      <div class="text-center border-b pb-4 mb-4">
-        <h1 class="text-2xl font-bold">B5 Cuisine - Z-Report Ledger</h1>
-        <p class="text-sm">Period: {{ startDate }} to {{ endDate }}</p>
-        <p class="text-xs text-gray-500">Generated: {{ new Date().toLocaleString() }}</p>
-      </div>
-      <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
-        <div><strong>Gross Revenue:</strong> RM {{ reportStats.totalRevenue.toFixed(2) }}</div>
-        <div><strong>Total Tax Collected:</strong> RM {{ reportStats.totalTax.toFixed(2) }}</div>
-        <div><strong>Completed Orders:</strong> {{ reportStats.totalOrders }}</div>
-        <div><strong>Voided Amount:</strong> RM {{ reportStats.voidTotal.toFixed(2) }}</div>
-      </div>
-      <h3 class="font-bold border-b mb-2">Itemized Invoice Log</h3>
-      <table class="w-full text-xs text-left border-collapse">
-        <thead>
-          <tr class="border-b"><th class="py-1">Check#</th><th class="py-1">Date</th><th class="py-1">Table</th><th class="py-1">Method</th><th class="py-1 text-right">Total</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="l in filteredLogs" :key="l.id" class="border-b">
-            <td class="py-1">{{ l.check_no || l.id }}</td>
-            <td class="py-1">{{ formatFullDateTime(l.created_at) }}</td>
-            <td class="py-1">T-{{ l.table_no }}</td>
-            <td class="py-1">{{ l.pay_method }}</td>
-            <td class="py-1 text-right">RM {{ getLogTotal(l).toFixed(2) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Modals for Payment, PIN, Move Table -->
+    <!-- Checkout Modal -->
     <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-        <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
         <div class="bg-amber-50 p-3 rounded-lg flex justify-between items-center">
-          <span class="text-amber-800 font-medium">Grand Total</span>
-          <span class="text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
+          <span class="text-amber-800 text-xs font-medium">Grand Total</span>
+          <span class="text-xl sm:text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
           <div class="grid grid-cols-3 gap-2">
-            <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" :key="m" @click="selectedPayMethod = m" :class="['py-2 text-xs font-semibold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']">
+            <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" :key="m" @click="selectedPayMethod = m" :class="['py-2 text-xs font-bold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 border-gray-200 text-gray-700']">
               {{ m }}
             </button>
           </div>
         </div>
-        <div v-if="selectedPayMethod === 'Cash'" class="space-y-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Cash Received (RM)</label>
-            <input type="number" step="0.01" v-model.number="cashReceived" class="w-full border rounded-lg p-2.5 text-lg font-bold focus:ring-2 focus:ring-amber-500 outline-none" />
-          </div>
-          <div class="flex justify-between text-sm font-bold">
+        <div v-if="selectedPayMethod === 'Cash'" class="space-y-2">
+          <label class="block text-xs font-medium text-gray-700">Cash Received (RM)</label>
+          <input type="number" step="0.01" v-model.number="cashReceived" class="w-full border rounded-lg p-2.5 text-lg font-bold outline-none" />
+          <div class="flex justify-between text-xs font-bold">
             <span>Change Due:</span>
             <span :class="cashChange >= 0 ? 'text-green-600' : 'text-red-600'">RM {{ cashChange.toFixed(2) }}</span>
           </div>
         </div>
         <div class="flex gap-3 pt-2">
-          <button @click="showPaymentModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300">Cancel</button>
-          <button @click="confirmCheckout" class="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow">Complete Paid & Print</button>
+          <button @click="showPaymentModal = false" class="flex-1 py-3 bg-gray-200 text-gray-700 font-medium rounded-xl text-xs">Cancel</button>
+          <button @click="confirmCheckout" class="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl text-xs shadow">Paid & Print</button>
         </div>
       </div>
     </div>
 
+    <!-- PIN Modal -->
     <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-lock text-red-500"></i> Staff Authorization Required</h3>
-        <p class="text-xs text-gray-500">Please enter manager PIN to proceed.</p>
-        <div><input type="password" v-model="staffPassword" placeholder="Enter PIN" class="w-full border rounded-lg p-2.5 text-center text-xl tracking-widest font-bold focus:ring-2 focus:ring-red-500 outline-none" /></div>
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4">
+        <h3 class="text-base font-bold text-gray-800"><i class="fas fa-lock text-red-500"></i> Enter PIN</h3>
+        <input type="password" v-model="staffPassword" placeholder="PIN" class="w-full border rounded-lg p-2.5 text-center text-xl font-bold" />
         <div class="flex gap-3 pt-2">
-          <button @click="showPasswordModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
-          <button @click="verifyPasswordAndExecute" class="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow text-sm">Confirm</button>
+          <button @click="showPasswordModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 text-xs">Cancel</button>
+          <button @click="verifyPasswordAndExecute" class="flex-1 py-2 bg-red-600 text-white font-bold text-xs">Confirm</button>
         </div>
       </div>
     </div>
 
+    <!-- Move Table Modal -->
     <div v-if="showMoveModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold text-gray-800">{{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}</h3>
-        <p class="text-xs text-gray-500">Select target table for current Table {{ selectedTable }} orders.</p>
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4">
+        <h3 class="text-base font-bold text-gray-800">{{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}</h3>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Target Table</label>
-          <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500">
-            <option v-for="t in availableTargetTables" :key="t.table_no" :value="t.table_no">
-              Table {{ t.table_no }} ({{ getTableStatus(t.table_no) }})
-            </option>
+          <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold">
+            <option v-for="t in availableTargetTables" :key="t.table_no" :value="t.table_no">Table {{ t.table_no }}</option>
           </select>
         </div>
         <div class="flex gap-3 pt-2">
-          <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
-          <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm">Confirm Move</button>
+          <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 text-xs">Cancel</button>
+          <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold text-xs">Confirm</button>
         </div>
       </div>
     </div>
@@ -546,6 +512,7 @@
     createApp({
       setup() {
         const activeTab = ref('tables');
+        const tableViewMode = ref(window.innerWidth < 768 ? 'grid' : 'canvas'); // 手机默认Grid，电脑默认2D
         const isEditingItems = ref(false);
         const isEditLayout = ref(false);
 
@@ -565,7 +532,6 @@
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Date & Filter States
         const reportPreset = ref('today');
         const startDate = ref(new Date().toISOString().split('T')[0]);
         const endDate = ref(new Date().toISOString().split('T')[0]);
@@ -573,20 +539,16 @@
         const rawReportOrders = ref([]);
         const reportStats = ref({ totalRevenue: 0, totalTax: 0, totalOrders: 0, avgTicket: 0, voidTotal: 0, voidCount: 0 });
 
-        // Multi-Printer & Reprint Modal States
         const showReprintModal = ref(false);
         const targetReprintLog = ref(null);
         const selectedPrinterId = ref('bar');
         const printerOptions = ref([
           { id: 'bar', name: 'Bar Thermal Printer', ip: '192.168.1.93', icon: 'fas fa-glass-martini-alt' },
-          { id: 'counter', name: 'Counter Cashier Printer', ip: '192.168.1.100', icon: 'fas fa-cash-register' },
-          { id: 'pdf', name: 'Export PDF Document (Download)', ip: 'Virtual Printer', icon: 'fas fa-file-pdf' }
+          { id: 'counter', name: 'Counter Cashier Printer', ip: '192.168.1.100', icon: 'fas fa-cash-register' }
         ]);
 
-        // Drag & Modals
         let draggingTable = null, resizingTable = null;
-        let startX = 0, startY = 0, startW = 0, startH = 0;
-        let dragOffsetX = 0, dragOffsetY = 0;
+        let startX = 0, startY = 0, startW = 0, startH = 0, dragOffsetX = 0, dragOffsetY = 0;
 
         const showPaymentModal = ref(false);
         const selectedPayMethod = ref('Cash');
@@ -642,30 +604,15 @@
           const now = new Date();
           const format = (d) => d.toISOString().split('T')[0];
 
-          if (preset === 'today') {
-            startDate.value = format(now); endDate.value = format(now);
-          } else if (preset === 'yesterday') {
-            const y = new Date(); y.setDate(y.getDate() - 1);
-            startDate.value = format(y); endDate.value = format(y);
-          } else if (preset === 'week') {
-            const w = new Date(); w.setDate(w.getDate() - 7);
-            startDate.value = format(w); endDate.value = format(now);
-          } else if (preset === 'month') {
-            const m = new Date(now.getFullYear(), now.getMonth(), 1);
-            startDate.value = format(m); endDate.value = format(now);
-          } else if (preset === 'year') {
-            const yr = new Date(now.getFullYear(), 0, 1);
-            startDate.value = format(yr); endDate.value = format(now);
-          } else if (preset === 'all') {
-            startDate.value = '2020-01-01'; endDate.value = format(now);
-          }
+          if (preset === 'today') { startDate.value = format(now); endDate.value = format(now); }
+          else if (preset === 'yesterday') { const y = new Date(); y.setDate(y.getDate() - 1); startDate.value = format(y); endDate.value = format(y); }
+          else if (preset === 'week') { const w = new Date(); w.setDate(w.getDate() - 7); startDate.value = format(w); endDate.value = format(now); }
+          else if (preset === 'month') { const m = new Date(now.getFullYear(), now.getMonth(), 1); startDate.value = format(m); endDate.value = format(now); }
+          else if (preset === 'all') { startDate.value = '2020-01-01'; endDate.value = format(now); }
           fetchReportData();
         };
 
-        const switchToReports = () => {
-          activeTab.value = 'reports';
-          setReportPreset('today');
-        };
+        const switchToReports = () => { activeTab.value = 'reports'; setReportPreset('today'); };
 
         const fetchReportData = async () => {
           const client = initSupabase();
@@ -687,27 +634,13 @@
           filtered.forEach(o => {
             const total = getLogTotal(o);
             const sub = getLogSubtotal(o);
-            if (o.status === 'Paid') {
-              rev += total;
-              tax += sub * 0.10;
-              count++;
-            } else if (o.status === 'Void') {
-              voidAmt += total;
-              voidCnt++;
-            }
+            if (o.status === 'Paid') { rev += total; tax += sub * 0.10; count++; }
+            else if (o.status === 'Void') { voidAmt += total; voidCnt++; }
           });
 
-          reportStats.value = {
-            totalRevenue: rev,
-            totalTax: tax,
-            totalOrders: count,
-            avgTicket: count > 0 ? rev / count : 0,
-            voidTotal: voidAmt,
-            voidCount: voidCnt
-          };
+          reportStats.value = { totalRevenue: rev, totalTax: tax, totalOrders: count, avgTicket: count > 0 ? rev / count : 0, voidTotal: voidAmt, voidCount: voidCnt };
         };
 
-        // RESTORED COMPUTED ANALYTICS: TOP 5 DISHES & PAYMENT METHODS
         const top5Dishes = computed(() => {
           const dishMap = {};
           rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
@@ -736,18 +669,11 @@
           return rawReportOrders.value.filter(o => {
             const q = searchLog.value.toLowerCase();
             const itemsStr = (o.items || []).map(i => i.name).join(' ').toLowerCase();
-            return !q || 
-              (o.check_no && o.check_no.toLowerCase().includes(q)) ||
-              (o.table_no && o.table_no.toLowerCase().includes(q)) ||
-              (o.pay_method && o.pay_method.toLowerCase().includes(q)) ||
-              itemsStr.includes(q);
+            return !q || (o.check_no && o.check_no.toLowerCase().includes(q)) || (o.table_no && o.table_no.toLowerCase().includes(q)) || itemsStr.includes(q);
           });
         });
 
-        const getLogSubtotal = (o) => {
-          if (!o.items || !Array.isArray(o.items)) return 0;
-          return o.items.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
-        };
+        const getLogSubtotal = (o) => (o.items || []).reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
         const getLogTotal = (o) => getLogSubtotal(o) * 1.10;
 
         const formatFullDateTime = (ts) => {
@@ -756,159 +682,79 @@
           return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
-        // Open Modal to Select Specific Printer / PDF for Reprint
-        const openReprintModal = (log) => {
-          targetReprintLog.value = log;
-          showReprintModal.value = true;
-        };
+        const openReprintModal = (log) => { targetReprintLog.value = log; showReprintModal.value = true; };
 
         const executeReprint = async () => {
           if (!targetReprintLog.value) return;
           const log = targetReprintLog.value;
           const checkNo = log.check_no || `CHK-${log.id}`;
           const client = initSupabase();
-
-          if (selectedPrinterId.value === 'pdf') {
-            window.print();
-            showReprintModal.value = false;
-            return;
-          }
-
-          // Fetch selected printer details
           const targetPrinter = printerOptions.value.find(p => p.id === selectedPrinterId.value);
           const targetIp = targetPrinter ? targetPrinter.ip : '192.168.1.93';
 
-          // Insert into Supabase with direct printer_ip field
           await client.from('print_jobs').insert({
             job_type: 'REPRINT_RECEIPT',
             table_no: log.table_no,
             printer_ip: targetIp,
             printer_target_ip: targetIp,
-            content: { 
-              check_no: checkNo,
-              items: log.items || [], 
-              subtotal: getLogSubtotal(log),
-              total: getLogTotal(log), 
-              pay_method: log.pay_method || 'Cash',
-              created_at: log.created_at,
-              is_reprint: true
-            }
+            content: { check_no: checkNo, items: log.items || [], subtotal: getLogSubtotal(log), total: getLogTotal(log), pay_method: log.pay_method || 'Cash', created_at: log.created_at, is_reprint: true }
           });
 
           showReprintModal.value = false;
-          alert(`Reprint Task sent to [${targetPrinter.name} (${targetIp})] for ${checkNo}!`);
+          alert(`Reprint Task sent to [${targetPrinter.name} (${targetIp})]!`);
         };
 
-        // EXPORT AUDIT REPORT DIRECTLY TO EXCEL (.CSV)
         const exportToCSV = () => {
-          let csv = "Date & Time,Check No,Table,Status,Payment Method,Items Summary,Subtotal (RM),Tax 10% (RM),Grand Total (RM)\n";
-          
+          let csv = "Date,Check No,Table,Status,Method,Items Summary,Subtotal,Tax,Total\n";
           filteredLogs.value.forEach(o => {
-            const timeStr = `"${formatFullDateTime(o.created_at)}"`;
-            const checkStr = `"${o.check_no || 'CHK-' + o.id}"`;
-            const tableStr = `"T-${o.table_no}"`;
-            const statusStr = `"${o.status}"`;
-            const payStr = `"${o.pay_method || 'Cash'}"`;
             const itemsStr = `"${(o.items || []).map(i => `${i.qty}x ${i.name}`).join('; ')}"`;
-            const sub = getLogSubtotal(o).toFixed(2);
-            const tax = (sub * 0.10).toFixed(2);
-            const total = getLogTotal(o).toFixed(2);
-
-            csv += `${timeStr},${checkStr},${tableStr},${statusStr},${payStr},${itemsStr},${sub},${tax},${total}\n`;
+            csv += `"${formatFullDateTime(o.created_at)}","${o.check_no || 'CHK-' + o.id}","T-${o.table_no}","${o.status}","${o.pay_method || 'Cash'}",${itemsStr},${getLogSubtotal(o).toFixed(2)},${(getLogSubtotal(o)*0.1).toFixed(2)},${getLogTotal(o).toFixed(2)}\n`;
           });
-
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement("a");
-          const url = URL.createObjectURL(blob);
-          link.setAttribute("href", url);
-          link.setAttribute("download", `POS_Ledger_Report_${startDate.value}_to_${endDate.value}.csv`);
-          link.style.visibility = 'hidden';
-          document.body.appendChild(link);
+          link.href = URL.createObjectURL(blob);
+          link.download = `Report_${startDate.value}.csv`;
           link.click();
-          document.body.removeChild(link);
         };
 
-        const printCurrentReport = async () => {
-          const client = initSupabase();
-          await client.from('print_jobs').insert({
-            job_type: 'Z_REPORT',
-            printer_ip: '192.168.1.100',
-            content: { range: `${startDate.value} to ${endDate.value}`, stats: reportStats.value }
-          });
-          window.print();
-        };
+        const printCurrentReport = async () => { window.print(); };
 
-        // Layout & Order Handlers
-        const handleMouseDown = (table, e) => {
-          if (!isEditLayout.value) return;
-          draggingTable = table;
-          dragOffsetX = e.clientX - table.pos_x; dragOffsetY = e.clientY - table.pos_y;
-        };
-
-        const startResize = (table, e) => {
-          resizingTable = table; startX = e.clientX; startY = e.clientY; startW = table.width; startH = table.height;
-        };
-
+        const handleMouseDown = (table, e) => { if (!isEditLayout.value) return; draggingTable = table; dragOffsetX = e.clientX - table.pos_x; dragOffsetY = e.clientY - table.pos_y; };
+        const startResize = (table, e) => { resizingTable = table; startX = e.clientX; startY = e.clientY; startW = table.width; startH = table.height; };
         const handleMouseMove = (e) => {
           if (resizingTable) {
-            const deltaX = e.clientX - startX; const deltaY = e.clientY - startY;
-            if (resizingTable.shape === 'circle') {
-              const sz = Math.max(70, startW + Math.max(deltaX, deltaY));
-              resizingTable.width = sz; resizingTable.height = sz;
-            } else {
-              resizingTable.width = Math.max(70, startW + deltaX);
-              resizingTable.height = Math.max(70, startH + deltaY);
-            }
+            const deltaX = e.clientX - startX, deltaY = e.clientY - startY;
+            if (resizingTable.shape === 'circle') { const sz = Math.max(70, startW + Math.max(deltaX, deltaY)); resizingTable.width = sz; resizingTable.height = sz; }
+            else { resizingTable.width = Math.max(70, startW + deltaX); resizingTable.height = Math.max(70, startH + deltaY); }
             return;
           }
-          if (draggingTable && isEditLayout.value) {
-            draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX));
-            draggingTable.pos_y = Math.max(0, Math.min(400, e.clientY - dragOffsetY));
-          }
+          if (draggingTable && isEditLayout.value) { draggingTable.pos_x = Math.max(0, Math.min(650, e.clientX - dragOffsetX)); draggingTable.pos_y = Math.max(0, Math.min(400, e.clientY - dragOffsetY)); }
         };
-
         const handleMouseUp = () => { draggingTable = null; resizingTable = null; };
 
-        const setShape = (table, type) => {
-          table.shape = type;
-          if (type === 'rect') { table.width = 140; table.height = 90; }
-          else if (type === 'circle') { table.width = 110; table.height = 110; }
-          else { table.width = 100; table.height = 100; }
-        };
-
+        const setShape = (table, type) => { table.shape = type; };
         const saveTablePositions = async () => {
           const client = initSupabase();
-          for (const t of dbTables.value) {
-            await client.from('restaurant_tables').upsert({ table_no: t.table_no, pos_x: t.pos_x, pos_y: t.pos_y, width: t.width, height: t.height, shape: t.shape }, { onConflict: 'table_no' });
-          }
+          for (const t of dbTables.value) { await client.from('restaurant_tables').upsert({ table_no: t.table_no, pos_x: t.pos_x, pos_y: t.pos_y, width: t.width, height: t.height, shape: t.shape }, { onConflict: 'table_no' }); }
           isEditLayout.value = false;
           alert("Layout saved!");
         };
 
         const toggleSoldOut = async (item) => {
           const client = initSupabase();
-          const newStatus = !item.is_sold_out;
-          item.is_sold_out = newStatus;
-          await client.from('menu').update({ is_sold_out: newStatus }).eq('id', item.id);
+          item.is_sold_out = !item.is_sold_out;
+          await client.from('menu').update({ is_sold_out: item.is_sold_out }).eq('id', item.id);
         };
 
         const getTableOrders = (tableNo) => allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid' && o.status !== 'Void');
         const getTableStatus = (tableNo) => getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
-        const getTableCheckNo = (tableNo) => {
-          const orders = getTableOrders(tableNo);
-          return orders.length === 0 ? '-' : (orders[0].check_no || orders[0].order_no || `CHK-${orders[0].id}`);
-        };
-        const getTableItems = (tableNo) => {
-          let items = [];
-          getTableOrders(tableNo).forEach(o => { if (o.items && Array.isArray(o.items)) items = items.concat(o.items); });
-          return items;
-        };
+        const getTableCheckNo = (tableNo) => { const orders = getTableOrders(tableNo); return orders.length === 0 ? '-' : (orders[0].check_no || `CHK-${orders[0].id}`); };
+        const getTableItems = (tableNo) => { let items = []; getTableOrders(tableNo).forEach(o => { if (o.items) items = items.concat(o.items); }); return items; };
 
         const removeItem = async (targetItem) => { await updateItemQty(targetItem, -targetItem.qty); };
         const updateItemQty = async (targetItem, changeDelta) => {
           const client = initSupabase();
-          const activeOrders = getTableOrders(selectedTable.value);
-          for (const order of activeOrders) {
+          for (const order of getTableOrders(selectedTable.value)) {
             if (order.items && order.items.some(i => i.name === targetItem.name)) {
               let updatedItems = JSON.parse(JSON.stringify(order.items));
               const foundIndex = updatedItems.findIndex(i => i.name === targetItem.name);
@@ -940,90 +786,46 @@
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
           if (pendingAction.value === 'void_order') {
-            const ids = activeOrders.map(o => o.id);
-            await client.from('orders').update({ status: 'Void' }).in('id', ids);
+            await client.from('orders').update({ status: 'Void' }).in('id', activeOrders.map(o => o.id));
             await fetchData();
             alert(`Table ${selectedTable.value} order voided.`);
           }
         };
 
-        const openMoveModal = (type) => {
-          moveType.value = type;
-          const firstAvail = availableTargetTables.value[0];
-          targetTableNo.value = firstAvail ? firstAvail.table_no : '';
-          showMoveModal.value = true;
-        };
+        const openMoveModal = (type) => { moveType.value = type; targetTableNo.value = availableTargetTables.value[0]?.table_no || ''; showMoveModal.value = true; };
 
         const confirmTableMove = async () => {
           if (!targetTableNo.value) return;
           const client = initSupabase();
-          const activeOrders = getTableOrders(selectedTable.value);
-          const ids = activeOrders.map(o => o.id);
-          await client.from('orders').update({ table_no: targetTableNo.value }).in('id', ids);
+          await client.from('orders').update({ table_no: targetTableNo.value }).in('id', getTableOrders(selectedTable.value).map(o => o.id));
           showMoveModal.value = false;
           selectedTable.value = targetTableNo.value;
           await fetchData();
         };
 
         const printCheckReceipt = async (tableNo) => {
-          try {
-            const activeOrders = getTableOrders(tableNo);
-            if (activeOrders.length === 0) return alert("No active orders!");
-            const client = initSupabase();
-            await client.from('print_jobs').insert({
-              job_type: 'CHECK',
-              table_no: tableNo,
-              printer_ip: '192.168.1.100',
-              content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo), pax: 1 }
-            });
-            alert(`Check printed for Table ${tableNo}`);
-          } catch (err) { alert("Print Check Failed: " + err.message); }
+          const client = initSupabase();
+          await client.from('print_jobs').insert({ job_type: 'CHECK', table_no: tableNo, printer_ip: '192.168.1.100', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo) } });
+          alert(`Check printed for Table ${tableNo}`);
         };
 
-        const openPaymentModal = (tableNo) => {
-          selectedTable.value = tableNo;
-          cashReceived.value = Math.ceil(getTableTotal(tableNo));
-          selectedPayMethod.value = 'Cash';
-          showPaymentModal.value = true;
-        };
+        const openPaymentModal = (tableNo) => { selectedTable.value = tableNo; cashReceived.value = Math.ceil(getTableTotal(tableNo)); selectedPayMethod.value = 'Cash'; showPaymentModal.value = true; };
 
         const confirmCheckout = async () => {
-          try {
-            const tableNo = selectedTable.value;
-            const activeOrders = getTableOrders(tableNo);
-            if (activeOrders.length === 0) return;
-
-            const client = initSupabase();
-            await client.from('print_jobs').insert({
-              job_type: 'RECEIPT',
-              table_no: tableNo,
-              printer_ip: '192.168.1.100',
-              content: { 
-                check_no: getTableCheckNo(tableNo),
-                items: getTableItems(tableNo), 
-                total: currentTableTotal.value, 
-                pay_method: selectedPayMethod.value,
-                cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : currentTableTotal.value,
-                cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0
-              }
-            });
-
-            const orderIds = activeOrders.map(o => o.id);
-            await client.from('orders').update({ status: 'Paid', pay_method: selectedPayMethod.value }).in('id', orderIds);
-
-            showPaymentModal.value = false;
-            await fetchData();
-            alert(`Table ${tableNo} Checkout Complete!`);
-          } catch (err) { alert("Checkout Failed: " + err.message); }
+          const tableNo = selectedTable.value;
+          const activeOrders = getTableOrders(tableNo);
+          const client = initSupabase();
+          await client.from('print_jobs').insert({ job_type: 'RECEIPT', table_no: tableNo, printer_ip: '192.168.1.100', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: currentTableTotal.value, pay_method: selectedPayMethod.value } });
+          await client.from('orders').update({ status: 'Paid', pay_method: selectedPayMethod.value }).in('id', activeOrders.map(o => o.id));
+          showPaymentModal.value = false;
+          await fetchData();
+          alert(`Table ${tableNo} Checkout Complete!`);
         };
 
-        onMounted(() => {
-          fetchData();
-          setupRealtimeSubscription();
-        });
+        onMounted(() => { fetchData(); setupRealtimeSubscription(); });
 
         return {
-          activeTab, isEditingItems, isEditLayout, dbTables, allOrders, menuList, selectedTable, loading,
+          activeTab, tableViewMode, isEditingItems, isEditLayout, dbTables, allOrders, menuList, selectedTable, loading,
           reportPreset, startDate, endDate, searchLog, reportStats, top5Dishes, paymentBreakdown, filteredLogs,
           showReprintModal, targetReprintLog, selectedPrinterId, printerOptions,
           setReportPreset, switchToReports, fetchReportData, getLogSubtotal, getLogTotal, formatFullDateTime,
