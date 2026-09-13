@@ -3,291 +3,415 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>B5 Cuisine - Admin POS System (A1 Design Edition)</title>
+  <title>B5 Cuisine - Admin POS System (A1 Enhanced)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    [v-cloak] { display: none; }
-    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-  </style>
+  <!-- html2pdf.js for Client-Side Daily/Monthly Sales PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
-  <div id="app" v-cloak class="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+<body class="bg-gray-100 min-h-screen">
+  <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
-    <!-- Top Modern Header Bar (A1 Style) -->
-    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900 text-white p-4 sm:px-6 rounded-2xl shadow-lg border border-slate-800 gap-4">
-      <div class="flex items-center space-x-4">
-        <div class="bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 p-3 rounded-xl shadow-md font-black text-xl flex items-center justify-center w-12 h-12">
-          <i class="fas fa-utensils"></i>
+    <!-- Top Header Bar with Tab Navigation (A1 Modern Style) -->
+    <header class="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-amber-500 text-white p-2.5 rounded-lg shadow-sm">
+          <i class="fas fa-utensils text-xl"></i>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-xl font-extrabold tracking-tight">B5 Cuisine Admin POS</h1>
-            <span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold uppercase rounded-md tracking-wider">A1 Edition</span>
-          </div>
-          <p class="text-xs text-slate-400 font-medium">Live Floor Layout & Billing Control Center</p>
+          <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
+          <p class="text-xs text-gray-500">Live Table Monitor & Sales Reports Management</p>
         </div>
       </div>
-      
-      <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
-        <button @click="fetchData" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm">
-          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh Data
+
+      <!-- Navigation Tabs -->
+      <div class="flex bg-gray-100 p-1 rounded-xl gap-1">
+        <button 
+          @click="activeTab = 'tables'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'tables' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-th"></i> Tables & Orders
+        </button>
+        <button 
+          @click="activeTab = 'history'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'history' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-history"></i> Order History (Reprint)
+        </button>
+        <button 
+          @click="activeTab = 'reports'" 
+          :class="['px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2', activeTab === 'reports' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600 hover:text-gray-900']">
+          <i class="fas fa-chart-bar"></i> Sales Reports (PDF)
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+          <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
         </button>
       </div>
     </header>
 
-    <!-- Main Grid Layout -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- TAB 1: TABLES & LIVE ORDERS -->
+    <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- Left 2 Cols: Table Floor Layout -->
+      <!-- Left 2 Cols: Table Management -->
       <div class="lg:col-span-2 space-y-6">
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
-            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
-              <i class="fas fa-border-all text-amber-500"></i> Floor Layout & Table Status
+        <div class="bg-white p-5 rounded-xl shadow-sm">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <i class="fas fa-th text-amber-500"></i> Floor Layout / Tables
             </h2>
-            <div class="flex items-center gap-4 text-xs font-semibold">
-              <span class="flex items-center gap-1.5 text-slate-500"><i class="fas fa-circle text-[8px] text-slate-300"></i> Available</span>
-              <span class="flex items-center gap-1.5 text-amber-600"><i class="fas fa-circle text-[8px] text-amber-500"></i> Occupied</span>
+            <div class="text-xs text-gray-500 space-x-3">
+              <span><i class="fas fa-circle text-green-500"></i> Empty: {{ emptyTablesCount }}</span>
+              <span><i class="fas fa-circle text-amber-500"></i> Occupied: {{ occupiedTablesCount }}</span>
             </div>
           </div>
 
-          <!-- Table Grid Card Design (A1 Enhanced) -->
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             <div 
               v-for="table in tables" 
               :key="table.id"
               @click="selectTable(table.table_no)"
               :class="[
-                'p-4 rounded-xl cursor-pointer border-2 transition-all relative flex flex-col justify-between h-36 select-none',
-                selectedTable === table.table_no ? 'border-amber-500 ring-4 ring-amber-500/10 shadow-md bg-amber-50/20' : 'border-slate-100 hover:border-slate-300 bg-white',
-                getTableStatus(table.table_no) === 'Occupied' ? 'border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/20' : ''
+                'p-4 rounded-xl cursor-pointer border-2 transition relative flex flex-col justify-between h-32',
+                selectedTable === table.table_no ? 'border-amber-500 shadow-md ring-2 ring-amber-200' : 'border-gray-100',
+                getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-50 border-amber-200' : 'bg-white hover:border-gray-300'
               ]"
             >
               <div class="flex justify-between items-start">
-                <div>
-                  <span class="font-extrabold text-lg text-slate-800 tracking-tight block">T-{{ table.table_no }}</span>
-                  <span v-if="getTableStatus(table.table_no) === 'Occupied'" class="text-[10px] text-amber-600/80 font-bold tracking-wider uppercase">Active Order</span>
-                </div>
+                <span class="font-bold text-lg text-gray-800">Table {{ table.table_no }}</span>
                 <span :class="[
-                  'px-2 py-0.5 text-[10px] font-extrabold rounded-md uppercase tracking-wider border',
-                  getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                  'px-2 py-0.5 text-xs font-semibold rounded-full',
+                  getTableStatus(table.table_no) === 'Occupied' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
                 ]">
                   {{ getTableStatus(table.table_no) }}
                 </span>
               </div>
 
-              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-auto pt-2 border-t border-amber-100/60 flex flex-col justify-end">
-                <div class="flex justify-between items-center text-xs text-slate-500 mb-0.5">
-                  <span class="text-[11px]">Check</span>
-                  <span class="font-bold text-slate-700 font-mono text-[11px]">{{ getTableCheckNo(table.table_no) }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-slate-400 uppercase font-bold">Total</span>
-                  <span class="text-base font-black text-amber-600 font-mono">RM {{ getTableTotal(table.table_no).toFixed(2) }}</span>
-                </div>
+              <div v-if="getTableStatus(table.table_no) === 'Occupied'" class="mt-2">
+                <p class="text-xs text-gray-500">Check: <span class="font-bold text-gray-700">{{ getTableCheckNo(table.table_no) }}</span></p>
+                <p class="text-sm font-bold text-amber-600">RM {{ getTableTotal(table.table_no).toFixed(2) }}</p>
               </div>
-
-              <div v-else class="mt-auto text-xs text-slate-400 flex items-center justify-between">
-                <span class="text-[11px]">Ready</span>
-                <i class="fas fa-chair text-slate-200 text-sm"></i>
+              <div v-else class="text-xs text-gray-400">
+                Ready for seating
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Right Col: Selected Table Detail / Order Actions (A1 Terminal Style) -->
+      <!-- Right Col: Selected Table Detail / Order Actions -->
       <div class="space-y-6">
-        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 sticky top-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm sticky top-6">
           <div v-if="selectedTable" class="space-y-4">
-            
-            <!-- Table Header -->
-            <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+            <div class="flex justify-between items-center border-b pb-3">
               <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-xl font-extrabold text-slate-900">Table {{ selectedTable }}</h3>
-                  <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md border border-slate-200">
-                    {{ getTableStatus(selectedTable) }}
-                  </span>
-                </div>
-                <p class="text-xs text-slate-400 mt-0.5">Check ID: <span class="font-bold text-amber-600 font-mono">{{ getTableCheckNo(selectedTable) }}</span></p>
+                <h3 class="text-xl font-bold text-gray-800">Table {{ selectedTable }}</h3>
+                <p class="text-xs text-gray-500">Check#: <span class="font-bold text-amber-600">{{ getTableCheckNo(selectedTable) }}</span></p>
               </div>
-              <button @click="selectedTable = null" class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+              <button @click="selectedTable = null" class="text-gray-400 hover:text-gray-600">
                 <i class="fas fa-times"></i>
               </button>
             </div>
 
             <!-- Transfer & Join Actions -->
-            <div v-if="getTableItems(selectedTable).length > 0" class="grid grid-cols-2 gap-2">
-              <button @click="openMoveModal('transfer')" class="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200">
-                <i class="fas fa-exchange-alt text-slate-500"></i> Transfer Table
+            <div v-if="getTableItems(selectedTable).length > 0" class="flex gap-2">
+              <button @click="openMoveModal('transfer')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
+                <i class="fas fa-exchange-alt"></i> Transfer Table
               </button>
-              <button @click="openMoveModal('join')" class="py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-slate-200">
-                <i class="fas fa-object-group text-slate-500"></i> Join Table
+              <button @click="openMoveModal('join')" class="flex-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md flex items-center justify-center gap-1">
+                <i class="fas fa-object-group"></i> Join Table
               </button>
             </div>
 
-            <!-- Table Items List (A1 Styled Ticket) -->
-            <div class="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100/80 hover:border-slate-200 transition">
-                <div class="flex-1 pr-2">
-                  <div class="flex items-baseline gap-2">
-                    <span class="font-bold text-slate-800 text-sm">{{ item.name }}</span>
-                    <span class="text-xs font-black text-amber-600 bg-amber-100/60 px-1.5 py-0.2 rounded font-mono">x{{ item.qty }}</span>
-                  </div>
-                  <p v-if="item.remark" class="text-xs text-amber-600 font-medium italic mt-0.5">* {{ item.remark }}</p>
+            <!-- Table Items List -->
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div v-for="(item, idx) in getTableItems(selectedTable)" :key="idx" class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                <div class="flex-1">
+                  <p class="font-medium text-gray-800">{{ item.name }} x{{ item.qty }}</p>
+                  <p v-if="item.remark" class="text-xs text-amber-600">* {{ item.remark }}</p>
                 </div>
-                <div class="flex items-center gap-3">
-                  <span class="font-bold text-slate-900 font-mono text-sm">RM {{ (item.price * item.qty).toFixed(2) }}</span>
-                  <button @click="requestDeleteItem(item)" title="Delete Item" class="w-6 h-6 flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition text-xs">
-                    <i class="fas fa-trash-alt"></i>
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-gray-700">RM {{ (item.price * item.qty).toFixed(2) }}</span>
+                  <button @click="requestDeleteItem(item)" class="text-red-400 hover:text-red-600 text-xs p-1">
+                    <i class="fas fa-trash"></i>
                   </button>
                 </div>
               </div>
 
-              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-12 border-2 border-dashed border-slate-100 rounded-xl">
-                <i class="fas fa-receipt text-3xl text-slate-200 mb-2"></i>
-                <p class="text-xs text-slate-400 font-medium">No active items found for Table {{ selectedTable }}</p>
+              <div v-if="getTableItems(selectedTable).length === 0" class="text-center py-8 text-gray-400 text-sm">
+                No active order items on this table.
               </div>
             </div>
 
-            <!-- Bill Calculations (Admin A1 Invoice Format) -->
-            <div v-if="getTableItems(selectedTable).length > 0" class="border-t border-slate-100 pt-3 space-y-2 text-xs font-medium">
-              <div class="flex justify-between text-slate-500">
+            <!-- Bill Calculations -->
+            <div v-if="getTableItems(selectedTable).length > 0" class="border-t pt-3 space-y-1.5 text-sm">
+              <div class="flex justify-between text-gray-500">
                 <span>Subtotal</span>
-                <span class="font-mono">RM {{ getTableSubtotal(selectedTable).toFixed(2) }}</span>
+                <span>RM {{ getTableSubtotal(selectedTable).toFixed(2) }}</span>
               </div>
-              <div class="flex justify-between text-slate-500">
+              <div class="flex justify-between text-gray-500">
                 <span>Service Charge (10%)</span>
-                <span class="font-mono">RM {{ (getTableSubtotal(selectedTable) * 0.10).toFixed(2) }}</span>
+                <span>RM {{ (getTableSubtotal(selectedTable) * 0.10).toFixed(2) }}</span>
               </div>
-              <div class="flex justify-between text-base font-black text-slate-900 border-t border-slate-100 pt-2.5">
+              <div class="flex justify-between text-lg font-bold text-gray-900 border-t pt-2">
                 <span>Total Due</span>
-                <span class="text-amber-600 font-mono text-lg">RM {{ getTableTotal(selectedTable).toFixed(2) }}</span>
+                <span class="text-amber-600">RM {{ getTableTotal(selectedTable).toFixed(2) }}</span>
               </div>
             </div>
 
             <!-- Action Buttons -->
             <div v-if="getTableItems(selectedTable).length > 0" class="space-y-2 pt-2">
-              <div class="grid grid-cols-2 gap-2">
-                <button @click="printCheckReceipt(selectedTable)" class="py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs active:scale-95">
-                  <i class="fas fa-print text-amber-400"></i> Print Check
+              <div class="grid grid-cols-2 gap-3">
+                <button @click="printCheckReceipt(selectedTable)" class="py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
+                  <i class="fas fa-print"></i> Print Check
                 </button>
-                <button @click="openPaymentModal(selectedTable)" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs active:scale-95">
-                  <i class="fas fa-credit-card"></i> Checkout
+                <button @click="openPaymentModal(selectedTable)" class="py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center justify-center gap-2 text-sm">
+                  <i class="fas fa-cash-register"></i> Checkout
                 </button>
               </div>
-              <button @click="requestVoidOrder" class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 border border-rose-200/60">
+              <button @click="requestVoidOrder" class="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1 border border-red-200">
                 <i class="fas fa-ban"></i> Void Entire Order
               </button>
             </div>
           </div>
 
-          <div v-else class="text-center py-16 text-slate-400">
-            <div class="w-12 h-12 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
-              <i class="fas fa-hand-pointer text-xl"></i>
-            </div>
-            <p class="text-xs font-semibold text-slate-500">Select a table from floor layout</p>
-            <p class="text-[11px] text-slate-400 mt-1">View active orders, print bill or process checkout</p>
+          <div v-else class="text-center py-12 text-gray-400">
+            <i class="fas fa-mouse-pointer text-3xl mb-2 text-gray-300"></i>
+            <p>Select a table to view active orders or manage billing.</p>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Payment Modal (Admin A1 Modern Checkout Dialog) -->
-    <div v-if="showPaymentModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-100">
-        <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-            <i class="fas fa-cash-register text-emerald-600"></i> Checkout Table {{ selectedTable }}
-          </h3>
-          <button @click="showPaymentModal = false" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+    <!-- TAB 2: ORDER HISTORY & REPRINT -->
+    <div v-if="activeTab === 'history'" class="bg-white p-5 rounded-xl shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-history text-amber-500"></i> Order History & Receipt Reprint
+          </h2>
+          <p class="text-xs text-gray-500">Select any completed or past transaction to reprint receipt to physical printer.</p>
         </div>
-        
-        <div class="bg-amber-50/70 border border-amber-200/60 p-4 rounded-xl flex justify-between items-center">
-          <span class="text-amber-900 font-bold text-sm">Grand Total</span>
-          <span class="text-2xl font-black text-amber-600 font-mono">RM {{ currentTableTotal.toFixed(2) }}</span>
+        <input 
+          type="text" 
+          v-model="historySearch" 
+          placeholder="Search Table / Check No..." 
+          class="border rounded-lg px-3 py-1.5 text-xs w-64 focus:ring-2 focus:ring-amber-500 outline-none"
+        />
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr class="bg-gray-50 border-b text-xs text-gray-500 uppercase">
+              <th class="p-3">Check / Order ID</th>
+              <th class="p-3">Table</th>
+              <th class="p-3">Payment Method</th>
+              <th class="p-3">Status</th>
+              <th class="p-3 text-right">Total Amount</th>
+              <th class="p-3 text-center">Actions (Reprint)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in filteredHistoryOrders" :key="order.id" class="border-b hover:bg-gray-50 transition">
+              <td class="p-3 font-semibold text-gray-800">{{ order.check_no || order.order_no || ('CHK-' + order.id) }}</td>
+              <td class="p-3 font-medium">Table {{ order.table_no }}</td>
+              <td class="p-3"><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-semibold">{{ order.pay_method || 'Cash' }}</span></td>
+              <td class="p-3">
+                <span :class="['px-2 py-0.5 rounded-full text-xs font-bold', order.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800']">
+                  {{ order.status }}
+                </span>
+              </td>
+              <td class="p-3 text-right font-bold text-gray-900">RM {{ (order.total || calculateOrderTotal(order)).toFixed(2) }}</td>
+              <td class="p-3 text-center">
+                <button @click="reprintReceipt(order)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition inline-flex items-center gap-1 shadow-sm">
+                  <i class="fas fa-print"></i> Reprint Receipt
+                </button>
+              </td>
+            </tr>
+            <tr v-if="filteredHistoryOrders.length === 0">
+              <td colspan="6" class="text-center py-8 text-gray-400">No past orders found in record.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: DAILY & MONTHLY SALES REPORTS (PDF) -->
+    <div v-if="activeTab === 'reports'" class="space-y-6">
+      
+      <!-- Filter Bar -->
+      <div class="bg-white p-5 rounded-xl shadow-sm flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-chart-line text-amber-500"></i> Sales Reports & PDF Export
+          </h2>
+          <p class="text-xs text-gray-500">Generate, print, and export Daily or Monthly revenue summaries.</p>
         </div>
 
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Select Payment Method</label>
+        <div class="flex items-center gap-3">
+          <div class="flex bg-gray-100 p-1 rounded-lg">
+            <button 
+              @click="reportRange = 'daily'" 
+              :class="['px-3 py-1.5 text-xs font-bold rounded-md transition', reportRange === 'daily' ? 'bg-amber-500 text-white shadow' : 'text-gray-600']">
+              Daily Report
+            </button>
+            <button 
+              @click="reportRange = 'monthly'" 
+              :class="['px-3 py-1.5 text-xs font-bold rounded-md transition', reportRange === 'monthly' ? 'bg-amber-500 text-white shadow' : 'text-gray-600']">
+              Monthly Report
+            </button>
+          </div>
+          
+          <button @click="generateAndPrintPDF" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs transition flex items-center gap-2 shadow">
+            <i class="fas fa-file-pdf"></i> Export / Print PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Report Area -->
+      <div id="pdf-report-area" class="bg-white p-6 rounded-xl shadow-sm space-y-6 border border-gray-100">
+        <!-- Header -->
+        <div class="border-b pb-4 flex justify-between items-start">
+          <div>
+            <h1 class="text-2xl font-extrabold text-gray-900">B5 CUISINE</h1>
+            <p class="text-sm font-bold text-amber-600 uppercase tracking-wider">{{ reportRange }} Sales Summary Report</p>
+          </div>
+          <div class="text-right text-xs text-gray-500">
+            <p>Generated: {{ new Date().toLocaleString() }}</p>
+            <p>Scope: {{ reportRange === 'daily' ? 'Today\'s Transactions' : 'Current Month Transactions' }}</p>
+          </div>
+        </div>
+
+        <!-- Summary Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+            <p class="text-xs text-amber-700 font-bold uppercase">Total Revenue</p>
+            <p class="text-2xl font-extrabold text-amber-600 mt-1">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+            <p class="text-xs text-blue-700 font-bold uppercase">Total Orders</p>
+            <p class="text-2xl font-extrabold text-blue-600 mt-1">{{ reportStats.totalOrders }}</p>
+          </div>
+          <div class="bg-green-50 border border-green-200 p-4 rounded-xl">
+            <p class="text-xs text-green-700 font-bold uppercase">Average Ticket</p>
+            <p class="text-2xl font-extrabold text-green-600 mt-1">RM {{ reportStats.avgTicket.toFixed(2) }}</p>
+          </div>
+        </div>
+
+        <!-- Breakdown Table -->
+        <div>
+          <h3 class="text-sm font-bold text-gray-800 mb-3 border-l-4 border-amber-500 pl-2">Sales Breakdown Ledger</h3>
+          <table class="w-full text-left text-xs border">
+            <thead>
+              <tr class="bg-gray-100 border-b">
+                <th class="p-2 border-r">Date / Time</th>
+                <th class="p-2 border-r">Check No</th>
+                <th class="p-2 border-r">Table</th>
+                <th class="p-2 border-r">Payment</th>
+                <th class="p-2 text-right">Amount (RM)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in reportOrders" :key="order.id" class="border-b">
+                <td class="p-2 border-r">{{ formatTimestamp(order.created_at) }}</td>
+                <td class="p-2 border-r font-medium">{{ order.check_no || order.order_no || ('CHK-' + order.id) }}</td>
+                <td class="p-2 border-r">Table {{ order.table_no }}</td>
+                <td class="p-2 border-r">{{ order.pay_method || 'Cash' }}</td>
+                <td class="p-2 text-right font-bold">RM {{ (order.total || calculateOrderTotal(order)).toFixed(2) }}</td>
+              </tr>
+              <tr v-if="reportOrders.length === 0">
+                <td colspan="5" class="p-4 text-center text-gray-400">No records found for the selected timeframe.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Payment Modal -->
+    <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+        <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
+        
+        <div class="bg-amber-50 p-3 rounded-lg flex justify-between items-center">
+          <span class="text-amber-800 font-medium">Grand Total</span>
+          <span class="text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
           <div class="grid grid-cols-3 gap-2">
             <button 
               v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" 
               :key="m" 
               @click="selectedPayMethod = m"
-              :class="['py-2.5 text-xs font-extrabold rounded-xl border transition flex items-center justify-center gap-1.5', selectedPayMethod === m ? 'bg-slate-900 text-amber-400 border-slate-900 shadow-md' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100']"
+              :class="['py-2 text-xs font-semibold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']"
             >
               {{ m }}
             </button>
           </div>
         </div>
 
-        <div v-if="selectedPayMethod === 'Cash'" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <div v-if="selectedPayMethod === 'Cash'" class="space-y-3">
           <div>
-            <label class="block text-xs font-bold text-slate-600 mb-1">Cash Received (RM)</label>
-            <input type="number" step="0.01" v-model.number="cashReceived" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xl font-bold font-mono focus:ring-2 focus:ring-amber-500 outline-none" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cash Received (RM)</label>
+            <input type="number" step="0.01" v-model.number="cashReceived" class="w-full border rounded-lg p-2.5 text-lg font-bold focus:ring-2 focus:ring-amber-500 outline-none" />
           </div>
-          <div class="flex justify-between items-center text-sm font-bold pt-1">
-            <span class="text-slate-600">Change Due:</span>
-            <span :class="['font-mono text-base', cashChange >= 0 ? 'text-emerald-600' : 'text-rose-600']">RM {{ cashChange.toFixed(2) }}</span>
+          <div class="flex justify-between text-sm font-bold">
+            <span>Change Due:</span>
+            <span :class="cashChange >= 0 ? 'text-green-600' : 'text-red-600'">RM {{ cashChange.toFixed(2) }}</span>
           </div>
         </div>
 
         <div class="flex gap-3 pt-2">
-          <button @click="showPaymentModal = false" class="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition text-xs">Cancel</button>
-          <button @click="confirmCheckout" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-md transition text-xs active:scale-95">Complete Paid & Print</button>
+          <button @click="showPaymentModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300">Cancel</button>
+          <button @click="confirmCheckout" class="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow">Complete Paid & Print</button>
         </div>
       </div>
     </div>
 
-    <!-- Password Modal (PIN Verification Dialog) -->
-    <div v-if="showPasswordModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100">
-        <div class="text-center">
-          <div class="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-2">
-            <i class="fas fa-lock text-xl"></i>
-          </div>
-          <h3 class="text-base font-extrabold text-slate-900">Staff Authorization</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Enter PIN to authorize order deletion or void action.</p>
-        </div>
+    <!-- Password Modal (for Deleting Items / Voiding Order) -->
+    <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-lock text-red-500"></i> Staff Authorization Required
+        </h3>
+        <p class="text-xs text-gray-500">Please enter manager/staff PIN to perform this action.</p>
         <div>
-          <input type="password" v-model="staffPassword" placeholder="••••" class="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 text-center text-2xl tracking-widest font-black focus:ring-2 focus:ring-rose-500 outline-none" font-mono />
+          <input type="password" v-model="staffPassword" placeholder="Enter PIN" class="w-full border rounded-lg p-2.5 text-center text-xl tracking-widest font-bold focus:ring-2 focus:ring-red-500 outline-none" />
         </div>
-        <div class="flex gap-2 pt-2">
-          <button @click="showPasswordModal = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition text-xs">Cancel</button>
-          <button @click="verifyPasswordAndExecute" class="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 shadow-md transition text-xs">Authorize</button>
+        <div class="flex gap-3 pt-2">
+          <button @click="showPasswordModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+          <button @click="verifyPasswordAndExecute" class="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow text-sm">Confirm</button>
         </div>
       </div>
     </div>
 
     <!-- Transfer / Join Table Modal -->
-    <div v-if="showMoveModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100">
-        <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-          <i class="fas fa-exchange-alt text-amber-500"></i>
+    <div v-if="showMoveModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <h3 class="text-lg font-bold text-gray-800">
           {{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}
         </h3>
-        <p class="text-xs text-slate-400">Select target destination table for Table {{ selectedTable }} orders.</p>
+        <p class="text-xs text-gray-500">Select target table for current Table {{ selectedTable }} orders.</p>
         
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">Target Table</label>
-          <select v-model="targetTableNo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500">
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Target Table</label>
+          <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500">
             <option v-for="t in availableTargetTables" :key="t.table_no" :value="t.table_no">
               Table {{ t.table_no }} ({{ getTableStatus(t.table_no) }})
             </option>
           </select>
         </div>
 
-        <div class="flex gap-2 pt-2">
-          <button @click="showMoveModal = false" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition text-xs">Cancel</button>
-          <button @click="confirmTableMove" class="flex-1 py-2.5 bg-amber-500 text-slate-950 font-extrabold rounded-xl hover:bg-amber-400 shadow-md transition text-xs">Confirm Action</button>
+        <div class="flex gap-3 pt-2">
+          <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+          <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm">Confirm Move</button>
         </div>
       </div>
     </div>
@@ -297,33 +421,38 @@
   <script>
     const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co";
     const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-    const STAFF_PIN = "1234"; // Staff PIN 密码
+    const STAFF_PIN = "1234"; 
 
     const { createApp, ref, computed, onMounted } = Vue;
     let supabaseClient = null;
 
     createApp({
       setup() {
+        const activeTab = ref('tables'); // 'tables', 'history', 'reports'
+        const historySearch = ref('');
+        const reportRange = ref('daily'); // 'daily', 'monthly'
+
         const tables = ref([
           { id: 1, table_no: 'A01' }, { id: 2, table_no: 'A02' }, { id: 3, table_no: 'A03' }, { id: 4, table_no: 'A04' },
           { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
         ]);
         const allOrders = ref([]);
+        const allHistoricalOrders = ref([]);
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // Modals state
+        // Modals
         const showPaymentModal = ref(false);
         const selectedPayMethod = ref('Cash');
         const cashReceived = ref(0);
 
         const showPasswordModal = ref(false);
         const staffPassword = ref('');
-        const pendingAction = ref(null); // 'delete_item' or 'void_order'
+        const pendingAction = ref(null);
         const pendingItemTarget = ref(null);
 
         const showMoveModal = ref(false);
-        const moveType = ref('transfer'); // 'transfer' or 'join'
+        const moveType = ref('transfer');
         const targetTableNo = ref('');
 
         const initSupabase = () => {
@@ -335,9 +464,17 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
-            if (error) throw error;
-            allOrders.value = data || [];
+            
+            // Active Unpaid Orders
+            const { data: activeData, error: activeErr } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
+            if (activeErr) throw activeErr;
+            allOrders.value = activeData || [];
+
+            // All Orders for History & Reports
+            const { data: histData, error: histErr } = await client.from('orders').select('*').order('created_at', { ascending: false });
+            if (histErr) throw histErr;
+            allHistoricalOrders.value = histData || [];
+
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
           } finally {
@@ -362,6 +499,14 @@
         const getTableStatus = (tableNo) => {
           return getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
         };
+
+        const emptyTablesCount = computed(() => {
+          return tables.value.filter(t => getTableStatus(t.table_no) === 'Empty').length;
+        });
+
+        const occupiedTablesCount = computed(() => {
+          return tables.value.filter(t => getTableStatus(t.table_no) === 'Occupied').length;
+        });
 
         const getTableCheckNo = (tableNo) => {
           const orders = getTableOrders(tableNo);
@@ -391,6 +536,12 @@
           return sub * 1.10;
         };
 
+        const calculateOrderTotal = (order) => {
+          if (!order.items || !Array.isArray(order.items)) return 0;
+          const sub = order.items.reduce((s, i) => s + (Number(i.price || 0) * Number(i.qty || 1)), 0);
+          return sub * 1.10;
+        };
+
         const currentTableTotal = computed(() => {
           return selectedTable.value ? getTableTotal(selectedTable.value) : 0;
         });
@@ -403,11 +554,48 @@
           return tables.value.filter(t => t.table_no !== selectedTable.value);
         });
 
+        const filteredHistoryOrders = computed(() => {
+          if (!historySearch.value) return allHistoricalOrders.value;
+          const q = historySearch.value.toLowerCase();
+          return allHistoricalOrders.value.filter(o => {
+            const check = (o.check_no || o.order_no || `CHK-${o.id}`).toLowerCase();
+            const table = (o.table_no || '').toLowerCase();
+            return check.includes(q) || table.includes(q);
+          });
+        });
+
+        // Reports filtering & calculation
+        const reportOrders = computed(() => {
+          const now = new Date();
+          return allHistoricalOrders.value.filter(o => {
+            if (o.status !== 'Paid') return false;
+            const orderDate = new Date(o.created_at || Date.now());
+            if (reportRange.value === 'daily') {
+              return orderDate.toDateString() === now.toDateString();
+            } else {
+              return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+            }
+          });
+        });
+
+        const reportStats = computed(() => {
+          const orders = reportOrders.value;
+          const totalRevenue = orders.reduce((sum, o) => sum + (o.total || calculateOrderTotal(o)), 0);
+          const totalOrders = orders.length;
+          const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+          return { totalRevenue, totalOrders, avgTicket };
+        });
+
+        const formatTimestamp = (ts) => {
+          if (!ts) return '-';
+          return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        };
+
         const selectTable = (tableNo) => {
           selectedTable.value = tableNo;
         };
 
-        // --- 1. 删除单个菜品 & 删整单逻辑 ---
+        // --- 1. Void & Delete Actions ---
         const requestDeleteItem = (item) => {
           pendingAction.value = 'delete_item';
           pendingItemTarget.value = item;
@@ -452,7 +640,7 @@
           }
         };
 
-        // --- 2. 换桌 & 合单逻辑 ---
+        // --- 2. Table Move Actions ---
         const openMoveModal = (type) => {
           moveType.value = type;
           const firstAvail = availableTargetTables.value[0];
@@ -473,7 +661,7 @@
           alert(`Table successfully updated to ${targetTableNo.value}!`);
         };
 
-        // --- 3. 结账逻辑 ---
+        // --- 3. Printing & Reprinting (Paper Output via Supabase Queue) ---
         const printCheckReceipt = async (tableNo) => {
           try {
             const activeOrders = getTableOrders(tableNo);
@@ -490,12 +678,37 @@
               content: { check_no: checkNo, items, total, pax: 1 }
             });
 
-            alert(`Check Bill sent to printer for Table ${tableNo} [${checkNo}]`);
+            alert(`Check Bill sent to thermal printer for Table ${tableNo} [${checkNo}]`);
           } catch (err) {
             alert("Print Check Bill Failed: " + err.message);
           }
         };
 
+        const reprintReceipt = async (order) => {
+          try {
+            const client = initSupabase();
+            const checkNo = order.check_no || order.order_no || `CHK-${order.id}`;
+            const total = order.total || calculateOrderTotal(order);
+
+            await client.from('print_jobs').insert({
+              job_type: 'REPRINT_RECEIPT',
+              table_no: order.table_no,
+              content: { 
+                check_no: checkNo,
+                items: order.items || [], 
+                total: total, 
+                pay_method: order.pay_method || 'Cash',
+                reprint_at: new Date().toISOString()
+              }
+            });
+
+            alert(`Reprint request for ${checkNo} sent to Thermal Printer (192.168.1.93)!`);
+          } catch (err) {
+            alert("Reprint Failed: " + err.message);
+          }
+        };
+
+        // --- 4. Payment Checkout ---
         const openPaymentModal = (tableNo) => {
           selectedTable.value = tableNo;
           cashReceived.value = Math.ceil(getTableTotal(tableNo));
@@ -532,7 +745,8 @@
             const orderIds = activeOrders.map(o => o.id);
             await client.from('orders').update({ 
               status: 'Paid',
-              pay_method: selectedPayMethod.value 
+              pay_method: selectedPayMethod.value,
+              total: total
             }).in('id', orderIds);
 
             showPaymentModal.value = false;
@@ -543,14 +757,34 @@
           }
         };
 
+        // --- 5. Export Sales PDF Report ---
+        const generateAndPrintPDF = () => {
+          const element = document.getElementById('pdf-report-area');
+          const opt = {
+            margin:       0.5,
+            filename:     `B5_Cuisine_${reportRange.value.toUpperCase()}_Sales_Report.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+          };
+          html2pdf().set(opt).from(element).save();
+        };
+
         onMounted(() => {
           fetchData();
           subscribeRealtime();
         });
 
         return {
+          activeTab,
+          historySearch,
+          reportRange,
           tables,
           allOrders,
+          allHistoricalOrders,
+          filteredHistoryOrders,
+          reportOrders,
+          reportStats,
           selectedTable,
           loading,
           showPaymentModal,
@@ -564,12 +798,16 @@
           moveType,
           targetTableNo,
           availableTargetTables,
+          emptyTablesCount,
+          occupiedTablesCount,
           fetchData,
           getTableStatus,
           getTableCheckNo,
           getTableItems,
           getTableSubtotal,
           getTableTotal,
+          calculateOrderTotal,
+          formatTimestamp,
           selectTable,
           requestDeleteItem,
           requestVoidOrder,
@@ -577,8 +815,10 @@
           openMoveModal,
           confirmTableMove,
           printCheckReceipt,
+          reprintReceipt,
           openPaymentModal,
-          confirmCheckout
+          confirmCheckout,
+          generateAndPrintPDF
         };
       }
     }).mount('#app');
