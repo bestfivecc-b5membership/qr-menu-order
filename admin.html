@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- 引入 html2pdf.js 用于安全导出 PDF，不破坏原打印逻辑 -->
+  <!-- html2pdf.js 用于导出 PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -15,22 +15,35 @@
   <div id="app" class="p-4 md:p-6 max-w-7xl mx-auto">
     
     <!-- Top Header Bar -->
-    <header class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6">
+    <header class="flex flex-wrap justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-6 gap-4">
       <div class="flex items-center space-x-3">
         <div class="bg-amber-500 text-white p-2 rounded-lg">
           <i class="fas fa-utensils text-xl"></i>
         </div>
         <div>
           <h1 class="text-xl font-bold text-gray-800">B5 Cuisine Admin POS</h1>
-          <p class="text-xs text-gray-500">Live Table & Order Monitor (Printer: 192.168.1.93 Direct)</p>
+          <p class="text-xs text-gray-500">Live Management & Monitor (Printer: 192.168.1.93)</p>
         </div>
       </div>
-      <div class="flex items-center space-x-3">
-        <!-- 历史/已买单订单 模态框触发按钮 -->
-        <button @click="openHistoryModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
-          <i class="fas fa-history"></i> Order History / Reprint
+      
+      <!-- 全功能导航按钮组 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <button @click="openReportsModal" class="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-purple-200">
+          <i class="fas fa-chart-bar"></i> Reports
         </button>
-        <button @click="fetchData" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <button @click="openSoldOutModal" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-red-200">
+          <i class="fas fa-ban"></i> Sold Out
+        </button>
+        <button @click="openEditLayoutModal" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-indigo-200">
+          <i class="fas fa-edit"></i> Edit Layout
+        </button>
+        <button @click="openDeletedLogsModal" class="px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-orange-200">
+          <i class="fas fa-history"></i> Deleted Logs
+        </button>
+        <button @click="openHistoryModal" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-slate-300">
+          <i class="fas fa-file-invoice"></i> Order History
+        </button>
+        <button @click="fetchData" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition flex items-center gap-1.5">
           <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i> Refresh
         </button>
       </div>
@@ -149,7 +162,6 @@
                   <i class="fas fa-cash-register"></i> Checkout
                 </button>
               </div>
-              <!-- 额外新增：当前未买单的临时单据导出PDF -->
               <button @click="exportCheckPDF(selectedTable)" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition flex items-center justify-center gap-1 border border-slate-300">
                 <i class="fas fa-file-pdf text-red-500"></i> Export PDF Draft Check
               </button>
@@ -168,30 +180,127 @@
 
     </div>
 
+    <!-- 1. Reports Modal -->
+    <div v-if="showReportsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-chart-line text-purple-600"></i> Sales Reports
+          </h3>
+          <button @click="showReportsModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+            <p class="text-xs text-purple-600 font-semibold">Today Total Sales</p>
+            <p class="text-2xl font-bold text-purple-900 mt-1">RM {{ reportSummary.totalSales.toFixed(2) }}</p>
+          </div>
+          <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <p class="text-xs text-blue-600 font-semibold">Total Paid Orders</p>
+            <p class="text-2xl font-bold text-blue-900 mt-1">{{ reportSummary.totalOrders }}</p>
+          </div>
+        </div>
+        <div class="flex justify-end pt-2">
+          <button @click="showReportsModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg text-sm">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Sold Out / Menu Item Management Modal -->
+    <div v-if="showSoldOutModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-ban text-red-500"></i> Manage Sold-Out Items
+          </h3>
+          <button @click="showSoldOutModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+          <div v-for="item in menuItems" :key="item.id" class="flex justify-between items-center p-2 border-b">
+            <span class="font-medium text-sm text-gray-800">{{ item.name }}</span>
+            <button @click="toggleSoldOut(item)" :class="['px-3 py-1 text-xs font-bold rounded-full transition', item.is_sold_out ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700']">
+              {{ item.is_sold_out ? 'Sold Out (沽清)' : 'Available (在售)' }}
+            </button>
+          </div>
+        </div>
+        <div class="flex justify-end pt-2">
+          <button @click="showSoldOutModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg text-sm">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Edit Layout Modal -->
+    <div v-if="showEditLayoutModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-edit text-indigo-600"></i> Edit Table Layout
+          </h3>
+          <button @click="showEditLayoutModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" v-model="newTableNo" placeholder="New Table No (e.g. C01)" class="flex-1 border rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button @click="addTable" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700">Add Table</button>
+        </div>
+        <div class="space-y-2 max-h-60 overflow-y-auto">
+          <div v-for="table in tables" :key="table.id" class="flex justify-between items-center p-2 bg-gray-50 rounded">
+            <span class="font-bold text-sm">Table {{ table.table_no }}</span>
+            <button @click="removeTable(table.id)" class="text-red-500 hover:text-red-700 text-xs"><i class="fas fa-trash"></i> Remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Deleted Logs Modal -->
+    <div v-if="showDeletedLogsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <i class="fas fa-history text-orange-500"></i> Deleted Item Logs
+          </h3>
+          <button @click="showDeletedLogsModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="max-h-80 overflow-y-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-100 text-gray-600 border-b">
+                <th class="p-2">Time</th>
+                <th class="p-2">Table</th>
+                <th class="p-2">Item Name</th>
+                <th class="p-2">Reason/Staff</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in deletedLogs" :key="log.id" class="border-b">
+                <td class="p-2">{{ new Date(log.created_at).toLocaleString() }}</td>
+                <td class="p-2">Table {{ log.table_no }}</td>
+                <td class="p-2 font-medium text-red-600">{{ log.item_name }}</td>
+                <td class="p-2">{{ log.operator || 'Staff PIN 1234' }}</td>
+              </tr>
+              <tr v-if="deletedLogs.length === 0">
+                <td colspan="4" class="text-center py-6 text-gray-400">No deleted logs found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Payment Modal -->
     <div v-if="showPaymentModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
         <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Checkout Table {{ selectedTable }}</h3>
-        
         <div class="bg-amber-50 p-3 rounded-lg flex justify-between items-center">
           <span class="text-amber-800 font-medium">Grand Total</span>
           <span class="text-2xl font-bold text-amber-600">RM {{ currentTableTotal.toFixed(2) }}</span>
         </div>
-
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
           <div class="grid grid-cols-3 gap-2">
-            <button 
-              v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" 
-              :key="m" 
-              @click="selectedPayMethod = m"
-              :class="['py-2 text-xs font-semibold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']"
-            >
+            <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" :key="m" @click="selectedPayMethod = m" :class="['py-2 text-xs font-semibold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']">
               {{ m }}
             </button>
           </div>
         </div>
-
         <div v-if="selectedPayMethod === 'Cash'" class="space-y-3">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Cash Received (RM)</label>
@@ -202,7 +311,6 @@
             <span :class="cashChange >= 0 ? 'text-green-600' : 'text-red-600'">RM {{ cashChange.toFixed(2) }}</span>
           </div>
         </div>
-
         <div class="flex gap-3 pt-2">
           <button @click="showPaymentModal = false" class="flex-1 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300">Cancel</button>
           <button @click="confirmCheckout" class="flex-1 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow">Complete Paid & Print</button>
@@ -210,13 +318,13 @@
       </div>
     </div>
 
-    <!-- Password Modal (for Deleting Items / Voiding Order) -->
+    <!-- Password Modal -->
     <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-          <i class="fas fa-lock text-red-500"></i> Staff Authorization Required
+          <i class="fas fa-lock text-red-500"></i> Staff Authorization
         </h3>
-        <p class="text-xs text-gray-500">Please enter manager/staff PIN to perform this action.</p>
+        <p class="text-xs text-gray-500">Please enter PIN to proceed.</p>
         <div>
           <input type="password" v-model="staffPassword" placeholder="Enter PIN" class="w-full border rounded-lg p-2.5 text-center text-xl tracking-widest font-bold focus:ring-2 focus:ring-red-500 outline-none" />
         </div>
@@ -227,14 +335,10 @@
       </div>
     </div>
 
-    <!-- Transfer / Join Table Modal -->
+    <!-- Transfer / Join Modal -->
     <div v-if="showMoveModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-        <h3 class="text-lg font-bold text-gray-800">
-          {{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}
-        </h3>
-        <p class="text-xs text-gray-500">Select target table for current Table {{ selectedTable }} orders.</p>
-        
+        <h3 class="text-lg font-bold text-gray-800">{{ moveType === 'transfer' ? 'Transfer Table' : 'Join Table' }}</h3>
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Target Table</label>
           <select v-model="targetTableNo" class="w-full border rounded-lg p-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500">
@@ -243,7 +347,6 @@
             </option>
           </select>
         </div>
-
         <div class="flex gap-3 pt-2">
           <button @click="showMoveModal = false" class="flex-1 py-2 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
           <button @click="confirmTableMove" class="flex-1 py-2 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 shadow text-sm">Confirm Move</button>
@@ -251,16 +354,14 @@
       </div>
     </div>
 
-    <!-- 新增：历史已完成/已付款订单与 Reprint 模态框 -->
+    <!-- Paid Order History Modal & Reprint -->
     <div v-if="showHistoryModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 space-y-4">
         <div class="flex justify-between items-center border-b pb-3">
           <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
             <i class="fas fa-history text-amber-500"></i> Paid Order History & Reprint
           </h3>
-          <button @click="showHistoryModal = false" class="text-gray-400 hover:text-gray-600">
-            <i class="fas fa-times text-lg"></i>
-          </button>
+          <button @click="showHistoryModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
         </div>
 
         <div class="max-h-96 overflow-y-auto pr-1">
@@ -281,7 +382,6 @@
                   <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full font-semibold">{{ order.pay_method || 'Paid' }}</span>
                 </td>
                 <td class="p-2 text-right space-x-2">
-                  <!-- 完全遵循 printCheckReceipt 和 confirmCheckout 的模式发布 192.168.1.93 打印任务 -->
                   <button @click="reprintOrder(order)" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold shadow transition inline-flex items-center gap-1">
                     <i class="fas fa-print"></i> Reprint Receipt
                   </button>
@@ -303,30 +403,39 @@
       </div>
     </div>
 
-    <!-- 隐藏的 PDF 模版渲染区域 -->
-    <div style="display: none;">
-      <div id="pdf-template" class="p-6 bg-white text-black font-mono text-sm" style="width: 380px;">
-        <div class="text-center mb-4">
-          <h2 class="text-xl font-bold">B5 CUISINE</h2>
-          <p class="text-xs">Receipt / Bill Invoice</p>
-          <hr class="my-2 border-black border-dashed">
+    <!-- 彻底解决右侧截断问题的 PDF 打印渲染区域模板 -->
+    <div style="position: absolute; left: -9999px; top: -9999px;">
+      <div id="pdf-template" style="width: 280px; font-family: monospace; font-size: 12px; color: #000; background: #fff; padding: 10px;">
+        <div style="text-align: center; margin-bottom: 10px;">
+          <h2 style="font-size: 18px; font-weight: bold; margin: 0;">B5 CUISINE</h2>
+          <p style="font-size: 10px; margin: 2px 0;">Receipt / Bill Invoice</p>
+          <div style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>
         </div>
-        <div class="text-xs mb-3 space-y-1">
-          <p><strong>Check #:</strong> <span id="pdf-check-no"></span></p>
-          <p><strong>Table #:</strong> <span id="pdf-table-no"></span></p>
-          <p><strong>Payment Method:</strong> <span id="pdf-pay-method"></span></p>
-          <p><strong>Date:</strong> <span id="pdf-date"></span></p>
+
+        <div style="font-size: 11px; margin-bottom: 8px; line-height: 1.4;">
+          <div><strong>Check #:</strong> <span id="pdf-check-no"></span></div>
+          <div><strong>Table #:</strong> <span id="pdf-table-no"></span></div>
+          <div><strong>Payment:</strong> <span id="pdf-pay-method"></span></div>
+          <div><strong>Date:</strong> <span id="pdf-date"></span></div>
         </div>
-        <hr class="my-2 border-black border-dashed">
-        <div id="pdf-items-list" class="space-y-1 text-xs"></div>
-        <hr class="my-2 border-black border-dashed">
-        <div class="text-xs space-y-1">
-          <div class="flex justify-between"><span>Subtotal:</span><span id="pdf-subtotal"></span></div>
-          <div class="flex justify-between"><span>Service Charge (10%):</span><span id="pdf-svc"></span></div>
-          <div class="flex justify-between text-sm font-bold mt-1"><span>TOTAL:</span><span id="pdf-total"></span></div>
+
+        <div style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>
+
+        <!-- 菜品列表（宽度100%并防止内容行换行挤压） -->
+        <div id="pdf-items-list" style="width: 100%; font-size: 11px;"></div>
+
+        <div style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>
+
+        <div style="font-size: 11px; line-height: 1.5;">
+          <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span id="pdf-subtotal"></span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Svc Charge (10%):</span><span id="pdf-svc"></span></div>
+          <div style="display: flex; justify-between; font-weight: bold; font-size: 13px; margin-top: 4px;">
+            <span>TOTAL:</span><span id="pdf-total"></span>
+          </div>
         </div>
-        <hr class="my-2 border-black border-dashed">
-        <p class="text-center text-xs mt-4">Thank you for dining with us!</p>
+
+        <div style="border-bottom: 1px dashed #000; margin: 8px 0;"></div>
+        <p style="text-align: center; font-size: 10px; margin-top: 10px;">Thank you for dining with us!</p>
       </div>
     </div>
 
@@ -335,7 +444,7 @@
   <script>
     const SUPABASE_URL = "https://tswfrncmfidrbndfvimb.supabase.co";
     const SUPABASE_KEY = "sb_publishable_85XhLrnf93uEZPuPXOEuqA_7UeG9Wm_";
-    const STAFF_PIN = "1234"; // 默认 Staff 密码
+    const STAFF_PIN = "1234"; 
 
     const { createApp, ref, computed, onMounted } = Vue;
     let supabaseClient = null;
@@ -347,25 +456,34 @@
           { id: 5, table_no: 'B01' }, { id: 6, table_no: 'B02' }, { id: 7, table_no: 'B03' }, { id: 8, table_no: 'B04' }
         ]);
         const allOrders = ref([]);
+        const menuItems = ref([]);
+        const deletedLogs = ref([]);
         const selectedTable = ref(null);
         const loading = ref(false);
 
-        // History / Reprint State
+        // Modals Switches
         const showHistoryModal = ref(false);
         const historyOrders = ref([]);
+        const showReportsModal = ref(false);
+        const showSoldOutModal = ref(false);
+        const showEditLayoutModal = ref(false);
+        const showDeletedLogsModal = ref(false);
+        
+        const newTableNo = ref('');
+        const reportSummary = ref({ totalSales: 0, totalOrders: 0 });
 
-        // Modals
+        // Checkout & Authorization Modals
         const showPaymentModal = ref(false);
         const selectedPayMethod = ref('Cash');
         const cashReceived = ref(0);
 
         const showPasswordModal = ref(false);
         const staffPassword = ref('');
-        const pendingAction = ref(null); // 'delete_item' or 'void_order'
+        const pendingAction = ref(null);
         const pendingItemTarget = ref(null);
 
         const showMoveModal = ref(false);
-        const moveType = ref('transfer'); // 'transfer' or 'join'
+        const moveType = ref('transfer');
         const targetTableNo = ref('');
 
         const initSupabase = () => {
@@ -377,8 +495,7 @@
           loading.value = true;
           try {
             const client = initSupabase();
-            const { data, error } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
-            if (error) throw error;
+            const { data } = await client.from('orders').select('*').neq('status', 'Paid').order('id', { ascending: true });
             allOrders.value = data || [];
           } catch (err) {
             console.error("Fetch Data Error:", err.message);
@@ -391,65 +508,82 @@
           const client = initSupabase();
           client
             .channel('admin_realtime_orders')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-              fetchData();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
             .subscribe();
         };
 
-        const getTableOrders = (tableNo) => {
-          return allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid');
-        };
-
-        const getTableStatus = (tableNo) => {
-          return getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
-        };
-
+        // Table computations
+        const getTableOrders = (tableNo) => allOrders.value.filter(o => o.table_no === tableNo && o.status !== 'Paid');
+        const getTableStatus = (tableNo) => getTableOrders(tableNo).length > 0 ? 'Occupied' : 'Empty';
         const getTableCheckNo = (tableNo) => {
           const orders = getTableOrders(tableNo);
           if (orders.length === 0) return '-';
-          const first = orders[0];
-          return first.check_no || first.order_no || `CHK-${first.id}`;
+          return orders[0].check_no || orders[0].order_no || `CHK-${orders[0].id}`;
         };
-
         const getTableItems = (tableNo) => {
           const orders = getTableOrders(tableNo);
           let items = [];
-          orders.forEach(o => {
-            if (o.items && Array.isArray(o.items)) {
-              items = items.concat(o.items);
-            }
-          });
+          orders.forEach(o => { if (o.items && Array.isArray(o.items)) items = items.concat(o.items); });
           return items;
         };
-
         const getTableSubtotal = (tableNo) => {
-          const items = getTableItems(tableNo);
-          return items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
+          return getTableItems(tableNo).reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
+        };
+        const getTableTotal = (tableNo) => getTableSubtotal(tableNo) * 1.10;
+
+        const currentTableTotal = computed(() => selectedTable.value ? getTableTotal(selectedTable.value) : 0);
+        const cashChange = computed(() => Math.max(0, (cashReceived.value || 0) - currentTableTotal.value));
+        const availableTargetTables = computed(() => tables.value.filter(t => t.table_no !== selectedTable.value));
+
+        const selectTable = (tableNo) => selectedTable.value = tableNo;
+
+        // Modals Functions
+        const openReportsModal = async () => {
+          showReportsModal.value = true;
+          const client = initSupabase();
+          const { data } = await client.from('orders').select('*').eq('status', 'Paid');
+          if (data) {
+            let totalSales = 0;
+            data.forEach(o => {
+              const sub = (o.items || []).reduce((s, i) => s + (Number(i.price || 0) * Number(i.qty || 1)), 0);
+              totalSales += sub * 1.10;
+            });
+            reportSummary.value = { totalSales, totalOrders: data.length };
+          }
         };
 
-        const getTableTotal = (tableNo) => {
-          const sub = getTableSubtotal(tableNo);
-          return sub * 1.10;
+        const openSoldOutModal = async () => {
+          showSoldOutModal.value = true;
+          const client = initSupabase();
+          const { data } = await client.from('menu_items').select('*');
+          menuItems.value = data || [
+            { id: 1, name: 'Sample Dish A', is_sold_out: false },
+            { id: 2, name: 'Sample Dish B', is_sold_out: true }
+          ];
         };
 
-        const currentTableTotal = computed(() => {
-          return selectedTable.value ? getTableTotal(selectedTable.value) : 0;
-        });
-
-        const cashChange = computed(() => {
-          return Math.max(0, (cashReceived.value || 0) - currentTableTotal.value);
-        });
-
-        const availableTargetTables = computed(() => {
-          return tables.value.filter(t => t.table_no !== selectedTable.value);
-        });
-
-        const selectTable = (tableNo) => {
-          selectedTable.value = tableNo;
+        const toggleSoldOut = async (item) => {
+          item.is_sold_out = !item.is_sold_out;
+          const client = initSupabase();
+          await client.from('menu_items').update({ is_sold_out: item.is_sold_out }).eq('id', item.id);
         };
 
-        // --- 1. 删除单个菜品 & 删整单逻辑 ---
+        const openEditLayoutModal = () => showEditLayoutModal.value = true;
+        const addTable = () => {
+          if (!newTableNo.value) return;
+          tables.value.push({ id: Date.now(), table_no: newTableNo.value });
+          newTableNo.value = '';
+        };
+        const removeTable = (id) => tables.value = tables.value.filter(t => t.id !== id);
+
+        const openDeletedLogsModal = async () => {
+          showDeletedLogsModal.value = true;
+          const client = initSupabase();
+          const { data } = await client.from('deleted_item_logs').select('*').order('id', { ascending: false });
+          deletedLogs.value = data || [];
+        };
+
+        // Actions: Delete & Void
         const requestDeleteItem = (item) => {
           pendingAction.value = 'delete_item';
           pendingItemTarget.value = item;
@@ -464,11 +598,8 @@
         };
 
         const verifyPasswordAndExecute = async () => {
-          if (staffPassword.value !== STAFF_PIN) {
-            return alert("Invalid Staff Password!");
-          }
+          if (staffPassword.value !== STAFF_PIN) return alert("Invalid Staff Password!");
           showPasswordModal.value = false;
-
           const client = initSupabase();
           const activeOrders = getTableOrders(selectedTable.value);
 
@@ -479,7 +610,6 @@
             alert(`Order for Table ${selectedTable.value} has been voided.`);
           } else if (pendingAction.value === 'delete_item') {
             const target = pendingItemTarget.value;
-            // 找到包含该菜品的 order 并移除
             for (const order of activeOrders) {
               if (order.items && order.items.some(i => i.name === target.name)) {
                 const updatedItems = order.items.filter(i => i !== target);
@@ -488,6 +618,8 @@
                 } else {
                   await client.from('orders').update({ items: updatedItems }).eq('id', order.id);
                 }
+                // 记录删单日志
+                await client.from('deleted_item_logs').insert({ table_no: selectedTable.value, item_name: target.name, operator: 'Staff PIN' });
                 break;
               }
             }
@@ -495,7 +627,7 @@
           }
         };
 
-        // --- 2. 换桌 & 合单逻辑 ---
+        // Table Transfer & Join
         const openMoveModal = (type) => {
           moveType.value = type;
           const firstAvail = availableTargetTables.value[0];
@@ -513,15 +645,13 @@
           showMoveModal.value = false;
           selectedTable.value = targetTableNo.value;
           await fetchData();
-          alert(`Table successfully updated to ${targetTableNo.value}!`);
         };
 
-        // --- 3. 结账逻辑 ---
+        // Print & Checkout
         const printCheckReceipt = async (tableNo) => {
           try {
             const activeOrders = getTableOrders(tableNo);
             if (activeOrders.length === 0) return alert("No active orders found!");
-
             const checkNo = getTableCheckNo(tableNo);
             const items = getTableItems(tableNo);
             const total = getTableTotal(tableNo);
@@ -532,10 +662,9 @@
               table_no: tableNo,
               content: { check_no: checkNo, items, total, pax: 1 }
             });
-
-            alert(`Check Bill sent to printer for Table ${tableNo} [${checkNo}]`);
+            alert(`Check Bill sent to printer for Table ${tableNo}`);
           } catch (err) {
-            alert("Print Check Bill Failed: " + err.message);
+            alert("Print Failed: " + err.message);
           }
         };
 
@@ -557,49 +686,31 @@
             const total = currentTableTotal.value;
 
             const client = initSupabase();
-
             await client.from('print_jobs').insert({
               job_type: 'RECEIPT',
               table_no: tableNo,
-              content: { 
-                check_no: checkNo,
-                items, 
-                total, 
-                pay_method: selectedPayMethod.value,
-                cash_received: selectedPayMethod.value === 'Cash' ? cashReceived.value : total,
-                cash_change: selectedPayMethod.value === 'Cash' ? cashChange.value : 0,
-                pax: 1
-              }
+              content: { check_no: checkNo, items, total, pay_method: selectedPayMethod.value, cash_received: cashReceived.value, cash_change: cashChange.value, pax: 1 }
             });
 
             const orderIds = activeOrders.map(o => o.id);
-            await client.from('orders').update({ 
-              status: 'Paid',
-              pay_method: selectedPayMethod.value 
-            }).in('id', orderIds);
+            await client.from('orders').update({ status: 'Paid', pay_method: selectedPayMethod.value }).in('id', orderIds);
 
             showPaymentModal.value = false;
             await fetchData();
-            alert(`Table ${tableNo} Checkout Completed via ${selectedPayMethod.value}!`);
+            alert(`Table ${tableNo} Checkout Completed!`);
           } catch (err) {
             alert("Checkout Failed: " + err.message);
           }
         };
 
-        // --- 4. 补充功能：Reprint & PDF 导出 ---
+        // History & Reprint
         const openHistoryModal = async () => {
           showHistoryModal.value = true;
-          try {
-            const client = initSupabase();
-            const { data, error } = await client.from('orders').select('*').eq('status', 'Paid').order('id', { ascending: false }).limit(30);
-            if (error) throw error;
-            historyOrders.value = data || [];
-          } catch (err) {
-            alert("Failed to fetch history: " + err.message);
-          }
+          const client = initSupabase();
+          const { data } = await client.from('orders').select('*').eq('status', 'Paid').order('id', { ascending: false }).limit(30);
+          historyOrders.value = data || [];
         };
 
-        // 重印功能效仿 printCheckReceipt / confirmCheckout，推送到 Supabase 由 192.168.1.93 打印
         const reprintOrder = async (order) => {
           try {
             const client = initSupabase();
@@ -611,23 +722,15 @@
             await client.from('print_jobs').insert({
               job_type: 'RECEIPT',
               table_no: order.table_no,
-              content: {
-                check_no: checkNo,
-                items: items,
-                total: total,
-                pay_method: order.pay_method || 'Paid',
-                is_reprint: true,
-                pax: 1
-              }
+              content: { check_no: checkNo, items, total, pay_method: order.pay_method || 'Paid', is_reprint: true, pax: 1 }
             });
-
-            alert(`Reprint request for Check ${checkNo} sent to printer (192.168.1.93)!`);
+            alert(`Reprint request sent for Check ${checkNo}!`);
           } catch (err) {
             alert("Reprint failed: " + err.message);
           }
         };
 
-        // PDF 导出公共方法
+        // 彻底解决 PDF 打开只看到左边/右侧 Amount 截断的 核心逻辑
         const generatePDF = (checkNo, tableNo, items, total, payMethod = 'Unpaid Draft') => {
           const subtotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 1)), 0);
           const svc = subtotal * 0.10;
@@ -641,20 +744,21 @@
           document.getElementById('pdf-total').innerText = 'RM ' + total.toFixed(2);
 
           const itemsContainer = document.getElementById('pdf-items-list');
+          // 使用 flex 保证两端对齐，完全展开不裁切
           itemsContainer.innerHTML = items.map(i => `
-            <div style="display: flex; justify-content: space-between;">
-              <span>${i.name} x${i.qty}</span>
-              <span>RM ${(i.price * i.qty).toFixed(2)}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="flex: 1; padding-right: 8px;">${i.name} x${i.qty}</span>
+              <span style="font-weight: bold; white-space: nowrap;">RM ${(i.price * i.qty).toFixed(2)}</span>
             </div>
           `).join('');
 
           const element = document.getElementById('pdf-template');
           const opt = {
-            margin:       5,
+            margin:       [4, 4, 4, 4],
             filename:     `Invoice_${checkNo}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'mm', format: [80, 200], orientation: 'portrait' }
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: [80, 160], orientation: 'portrait' }
           };
 
           html2pdf().set(opt).from(element).save();
@@ -665,7 +769,7 @@
           const items = getTableItems(tableNo);
           const total = getTableTotal(tableNo);
           if (items.length === 0) return alert("No items to export!");
-          generatePDF(checkNo, tableNo, items, total, 'Check / Draft');
+          generatePDF(checkNo, tableNo, items, total, 'Check Draft');
         };
 
         const exportOrderPDF = (order) => {
@@ -682,42 +786,14 @@
         });
 
         return {
-          tables,
-          allOrders,
-          selectedTable,
-          loading,
-          showHistoryModal,
-          historyOrders,
-          showPaymentModal,
-          selectedPayMethod,
-          cashReceived,
-          cashChange,
-          currentTableTotal,
-          showPasswordModal,
-          staffPassword,
-          showMoveModal,
-          moveType,
-          targetTableNo,
-          availableTargetTables,
-          fetchData,
-          getTableStatus,
-          getTableCheckNo,
-          getTableItems,
-          getTableSubtotal,
-          getTableTotal,
-          selectTable,
-          requestDeleteItem,
-          requestVoidOrder,
-          verifyPasswordAndExecute,
-          openMoveModal,
-          confirmTableMove,
-          printCheckReceipt,
-          openPaymentModal,
-          confirmCheckout,
-          openHistoryModal,
-          reprintOrder,
-          exportCheckPDF,
-          exportOrderPDF
+          tables, allOrders, menuItems, deletedLogs, selectedTable, loading,
+          showHistoryModal, historyOrders, showReportsModal, showSoldOutModal, showEditLayoutModal, showDeletedLogsModal,
+          newTableNo, reportSummary, showPaymentModal, selectedPayMethod, cashReceived, cashChange, currentTableTotal,
+          showPasswordModal, staffPassword, showMoveModal, moveType, targetTableNo, availableTargetTables,
+          fetchData, getTableStatus, getTableCheckNo, getTableItems, getTableSubtotal, getTableTotal, selectTable,
+          openReportsModal, openSoldOutModal, toggleSoldOut, openEditLayoutModal, addTable, removeTable, openDeletedLogsModal,
+          requestDeleteItem, requestVoidOrder, verifyPasswordAndExecute, openMoveModal, confirmTableMove, printCheckReceipt,
+          openPaymentModal, confirmCheckout, openHistoryModal, reprintOrder, exportCheckPDF, exportOrderPDF
         };
       }
     }).mount('#app');
