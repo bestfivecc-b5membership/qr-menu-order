@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     .circle-table { border-radius: 50% !important; }
@@ -89,7 +90,7 @@
             </div>
           </div>
 
-          <!-- Cards View (Mobile Friendly) -->
+          <!-- Cards View -->
           <div v-if="tableViewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             <div 
               v-for="table in dbTables" :key="table.table_no"
@@ -241,7 +242,7 @@
       </div>
     </div>
 
-    <!-- TAB 3: ENHANCED REPORTS & ANALYTICS -->
+    <!-- TAB 3: REPORTS & ANALYTICS -->
     <div v-if="activeTab === 'reports'" class="space-y-4 sm:space-y-6" id="printable-report">
       
       <!-- Filter Bar -->
@@ -294,7 +295,7 @@
         </div>
       </div>
 
-      <!-- PEAK HOURS (24-HOUR TIME DISTRIBUTION) CHART -->
+      <!-- PEAK HOURS CHART -->
       <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-3">
         <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
           <i class="fas fa-clock text-amber-500"></i> Peak Sales Hours Distribution (24H Traffic)
@@ -309,12 +310,10 @@
             <span class="text-[9px] text-gray-500 mt-1 font-mono">{{ h.hour.toString().padStart(2, '0') }}</span>
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 text-right">* Shows peak revenue times of the day (Hover bar for revenue amount).</p>
       </div>
 
-      <!-- TOP 10 DISHES & CLEAN PAYMENT METHOD BREAKDOWN -->
+      <!-- TOP 10 DISHES & PAYMENT BREAKDOWN -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <!-- TOP 10 DISHES -->
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm lg:col-span-2 space-y-3">
           <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
             <i class="fas fa-trophy text-amber-500"></i> Top 10 Best-Selling Dishes
@@ -334,7 +333,6 @@
           </div>
         </div>
 
-        <!-- PAYMENT METHOD SUMMARY (Normalized) -->
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-3">
           <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
             <i class="fas fa-wallet text-amber-500"></i> Payment Distribution
@@ -351,22 +349,27 @@
         </div>
       </div>
 
-      <!-- MAIN REPORT TABS (Invoices Log / Daily Sales / Monthly Sales / Yearly Sales) -->
+      <!-- MAIN REPORT CARDS (Invoices Log / Daily Sales / Monthly Sales / Yearly Sales) -->
       <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-4">
         
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
-          <!-- Report Type Switcher -->
           <div class="flex bg-gray-100 p-1 rounded-xl text-xs w-full sm:w-auto overflow-x-auto">
             <button v-for="t in [{ id: 'invoices', label: 'Invoices Log' }, { id: 'daily', label: 'Daily Sales' }, { id: 'monthly', label: 'Monthly Sales' }, { id: 'yearly', label: 'Yearly Sales' }]" :key="t.id" @click="reportViewType = t.id" :class="['px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap', reportViewType === t.id ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600']">
               {{ t.label }}
             </button>
           </div>
 
-          <input v-if="reportViewType === 'invoices'" type="text" v-model="searchLog" placeholder="Search Check#, Table, Items..." class="px-3 py-1.5 border rounded-lg text-xs outline-none w-full sm:w-64" />
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <input v-if="reportViewType === 'invoices'" type="text" v-model="searchLog" placeholder="Search Check#, Table..." class="px-3 py-1.5 border rounded-lg text-xs outline-none w-full sm:w-64" />
+            <!-- PRINT PDF BUTTON FOR CURRENT ACTIVE REPORT TAB -->
+            <button @click="downloadCardPDF(reportViewType)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+              <i class="fas fa-file-pdf"></i> Print PDF
+            </button>
+          </div>
         </div>
 
         <!-- VIEW 1: INVOICES LOG TABLE -->
-        <div v-if="reportViewType === 'invoices'">
+        <div v-if="reportViewType === 'invoices'" id="report-card-invoices">
           <div class="hidden md:block overflow-x-auto border rounded-xl">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
@@ -437,7 +440,7 @@
         </div>
 
         <!-- VIEW 2: DAILY SALES REPORT -->
-        <div v-if="reportViewType === 'daily'" class="overflow-x-auto border rounded-xl">
+        <div v-if="reportViewType === 'daily'" id="report-card-daily" class="overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
@@ -469,7 +472,7 @@
         </div>
 
         <!-- VIEW 3: MONTHLY SALES REPORT -->
-        <div v-if="reportViewType === 'monthly'" class="overflow-x-auto border rounded-xl">
+        <div v-if="reportViewType === 'monthly'" id="report-card-monthly" class="overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
@@ -501,7 +504,7 @@
         </div>
 
         <!-- VIEW 4: YEARLY SALES REPORT -->
-        <div v-if="reportViewType === 'yearly'" class="overflow-x-auto border rounded-xl">
+        <div v-if="reportViewType === 'yearly'" id="report-card-yearly" class="overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
@@ -536,7 +539,7 @@
 
     </div>
 
-    <!-- REPRINT MODAL -->
+    <!-- REPRINT MODAL (Target 192.168.1.93 Direct) -->
     <div v-if="showReprintModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
         <div class="flex justify-between items-center border-b pb-2">
@@ -545,9 +548,9 @@
         </div>
         <p class="text-xs text-gray-500">Invoice: <strong class="text-amber-600">{{ targetReprintLog?.check_no || `CHK-${targetReprintLog?.id}` }}</strong></p>
         <div class="space-y-2">
-          <label v-for="p in printerOptions" :key="p.id" :class="['flex items-center justify-between p-3 border rounded-xl cursor-pointer transition', selectedPrinterId === p.id ? 'border-amber-500 bg-amber-50/50' : 'bg-gray-50']">
+          <label v-for="p in printerOptions" :key="p.id" class="flex items-center justify-between p-3 border rounded-xl cursor-pointer transition border-amber-500 bg-amber-50/50">
             <div class="flex items-center gap-3">
-              <input type="radio" :value="p.id" v-model="selectedPrinterId" class="text-amber-500" />
+              <input type="radio" :value="p.id" v-model="selectedPrinterId" class="text-amber-500" checked />
               <div>
                 <p class="font-bold text-xs sm:text-sm text-gray-800">{{ p.name }}</p>
                 <p class="text-[10px] text-gray-500 font-mono">IP: {{ p.ip }}</p>
@@ -669,9 +672,10 @@
         const showReprintModal = ref(false);
         const targetReprintLog = ref(null);
         const selectedPrinterId = ref('bar');
+        
+        // 彻底移除 192.168.1.100，仅留有效打印机 192.168.1.93
         const printerOptions = ref([
-          { id: 'bar', name: 'Bar Thermal Printer', ip: '192.168.1.93', icon: 'fas fa-glass-martini-alt' },
-          { id: 'counter', name: 'Counter Cashier Printer', ip: '192.168.1.100', icon: 'fas fa-cash-register' }
+          { id: 'bar', name: 'Bar Thermal Printer', ip: '192.168.1.93', icon: 'fas fa-print' }
         ]);
 
         let draggingTable = null, resizingTable = null;
@@ -868,13 +872,13 @@
 
         const openReprintModal = (log) => { targetReprintLog.value = log; showReprintModal.value = true; };
 
+        // 重新打印发送至 192.168.1.93
         const executeReprint = async () => {
           if (!targetReprintLog.value) return;
           const log = targetReprintLog.value;
           const checkNo = log.check_no || `CHK-${log.id}`;
           const client = initSupabase();
-          const targetPrinter = printerOptions.value.find(p => p.id === selectedPrinterId.value);
-          const targetIp = targetPrinter ? targetPrinter.ip : '192.168.1.93';
+          const targetIp = '192.168.1.93';
 
           await client.from('print_jobs').insert({
             job_type: 'REPRINT_RECEIPT',
@@ -885,7 +889,24 @@
           });
 
           showReprintModal.value = false;
-          alert(`Reprint Task sent to [${targetPrinter.name} (${targetIp})]!`);
+          alert(`Reprint Task sent to [Bar Thermal Printer (${targetIp})]!`);
+        };
+
+        // 新增：把对应卡片/表格打印导出为 PDF 格式
+        const downloadCardPDF = (viewType) => {
+          const elemId = `report-card-${viewType}`;
+          const elem = document.getElementById(elemId);
+          if (!elem) return;
+
+          const opt = {
+            margin:       0.3,
+            filename:     `${viewType.toUpperCase()}_Sales_Report_${new Date().toISOString().split('T')[0]}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+          };
+
+          html2pdf().set(opt).from(elem).save();
         };
 
         const exportToCSV = () => {
@@ -987,19 +1008,21 @@
           await fetchData();
         };
 
+        // 下单/打印出单 统一修正为 192.168.1.93
         const printCheckReceipt = async (tableNo) => {
           const client = initSupabase();
-          await client.from('print_jobs').insert({ job_type: 'CHECK', table_no: tableNo, printer_ip: '192.168.1.100', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo) } });
+          await client.from('print_jobs').insert({ job_type: 'CHECK', table_no: tableNo, printer_ip: '192.168.1.93', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: getTableTotal(tableNo) } });
           alert(`Check printed for Table ${tableNo}`);
         };
 
         const openPaymentModal = (tableNo) => { selectedTable.value = tableNo; cashReceived.value = Math.ceil(getTableTotal(tableNo)); selectedPayMethod.value = 'Cash'; showPaymentModal.value = true; };
 
+        // Checkout 统一修正为 192.168.1.93
         const confirmCheckout = async () => {
           const tableNo = selectedTable.value;
           const activeOrders = getTableOrders(tableNo);
           const client = initSupabase();
-          await client.from('print_jobs').insert({ job_type: 'RECEIPT', table_no: tableNo, printer_ip: '192.168.1.100', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: currentTableTotal.value, pay_method: selectedPayMethod.value } });
+          await client.from('print_jobs').insert({ job_type: 'RECEIPT', table_no: tableNo, printer_ip: '192.168.1.93', content: { check_no: getTableCheckNo(tableNo), items: getTableItems(tableNo), total: currentTableTotal.value, pay_method: selectedPayMethod.value } });
           await client.from('orders').update({ status: 'Paid', pay_method: selectedPayMethod.value }).in('id', activeOrders.map(o => o.id));
           showPaymentModal.value = false;
           await fetchData();
@@ -1014,7 +1037,7 @@
           filteredLogs, aggregatedDailyReport, aggregatedMonthlyReport, aggregatedYearlyReport, allowedPaymentMethods,
           showReprintModal, targetReprintLog, selectedPrinterId, printerOptions,
           setReportPreset, switchToReports, fetchReportData, getLogSubtotal, getLogTotal, formatFullDateTime, getPaymentIcon,
-          openReprintModal, executeReprint, exportToCSV, printCurrentReport,
+          openReprintModal, executeReprint, downloadCardPDF, exportToCSV, printCurrentReport,
           showPaymentModal, selectedPayMethod, cashReceived, cashChange, currentTableTotal,
           showPasswordModal, staffPassword, showMoveModal, moveType, targetTableNo, availableTargetTables,
           handleMouseDown, startResize, handleMouseMove, handleMouseUp, setShape, saveTablePositions,
