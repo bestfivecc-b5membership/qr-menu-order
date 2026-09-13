@@ -20,14 +20,13 @@
       #printable-report, #printable-report * { visibility: visible; }
       #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
     }
-    /* 触摸屏优化 */
     button, input, select { touch-action: manipulation; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen select-none pb-12">
   <div id="app" class="p-2 sm:p-4 md:p-6 max-w-7xl mx-auto">
     
-    <!-- Top Header Bar (Responsive) -->
+    <!-- Top Header Bar -->
     <header class="flex flex-col md:flex-row justify-between items-center bg-white p-3 sm:p-4 rounded-xl shadow-sm mb-4 sm:mb-6 gap-3">
       <div class="flex items-center justify-between w-full md:w-auto">
         <div class="flex items-center space-x-3">
@@ -66,16 +65,13 @@
 
     <!-- TAB 1: FLOOR LAYOUT VIEW -->
     <div v-if="activeTab === 'tables'" class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-      
       <div class="lg:col-span-2 space-y-4">
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm">
           <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h2 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
               <i class="fas fa-th text-amber-500"></i> Tables Floor Layout
             </h2>
-            
             <div class="flex items-center gap-2">
-              <!-- Mobile/Desktop View Switcher -->
               <div class="flex bg-gray-100 p-1 rounded-lg text-xs">
                 <button @click="tableViewMode = 'grid'" :class="['px-2 py-1 rounded font-bold', tableViewMode === 'grid' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500']">
                   <i class="fas fa-th-large"></i> Cards
@@ -89,13 +85,11 @@
                 <i class="fas" :class="isEditLayout ? 'fa-check' : 'fa-arrows-alt'"></i>
                 <span class="hidden sm:inline">{{ isEditLayout ? 'Done' : 'Edit Layout' }}</span>
               </button>
-              <button v-if="isEditLayout && tableViewMode === 'canvas'" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white shadow">
-                Save
-              </button>
+              <button v-if="isEditLayout && tableViewMode === 'canvas'" @click="saveTablePositions" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-600 text-white shadow">Save</button>
             </div>
           </div>
 
-          <!-- MODE A: MOBILE-FRIENDLY GRID CARDS (默认手机极其好用) -->
+          <!-- Cards View (Mobile Friendly) -->
           <div v-if="tableViewMode === 'grid'" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             <div 
               v-for="table in dbTables" :key="table.table_no"
@@ -120,7 +114,7 @@
             </div>
           </div>
 
-          <!-- MODE B: DESKTOP 2D CANVAS LAYOUT -->
+          <!-- 2D Canvas Layout View -->
           <div v-else class="relative border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 w-full overflow-auto" style="height: 480px;" @mousemove="handleMouseMove" @mouseup="handleMouseUp" @mouseleave="handleMouseUp">
             <div 
               v-for="table in dbTables" :key="table.table_no"
@@ -163,7 +157,7 @@
         </div>
       </div>
 
-      <!-- Right/Bottom Col: Table Detail Panel -->
+      <!-- Table Detail Panel -->
       <div class="space-y-6">
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm">
           <div v-if="selectedTable" class="space-y-4">
@@ -247,21 +241,21 @@
       </div>
     </div>
 
-    <!-- TAB 3: REPORTS, ANALYTICS & EXCEL LEDGER -->
+    <!-- TAB 3: ENHANCED REPORTS & ANALYTICS -->
     <div v-if="activeTab === 'reports'" class="space-y-4 sm:space-y-6">
       
-      <!-- Top Presets Bar -->
+      <!-- Filter Bar -->
       <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
         <div class="flex justify-between items-center border-b pb-2 flex-wrap gap-2">
           <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-chart-line text-amber-500"></i> Ledger & Analytics
+            <i class="fas fa-chart-line text-amber-500"></i> Advanced Sales Analytics
           </h2>
           <div class="flex items-center gap-2">
             <button @click="exportToCSV" class="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg flex items-center gap-1">
-              <i class="fas fa-file-excel"></i> CSV
+              <i class="fas fa-file-excel"></i> CSV Export
             </button>
             <button @click="printCurrentReport" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center gap-1">
-              <i class="fas fa-print"></i> Z-Report
+              <i class="fas fa-print"></i> Print Z-Report
             </button>
           </div>
         </div>
@@ -280,139 +274,269 @@
         </div>
       </div>
 
-      <!-- KPI Overview Cards -->
+      <!-- KPI Summary Cards -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-green-500">
-          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Gross Rev</span>
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Gross Sales</span>
           <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.totalRevenue.toFixed(2) }}</p>
         </div>
         <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
-          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Tax (10%)</span>
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Service Charge (10%)</span>
           <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.totalTax.toFixed(2) }}</p>
         </div>
         <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
-          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Checks</span>
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Total Orders</span>
           <p class="text-lg sm:text-xl font-bold text-gray-800">{{ reportStats.totalOrders }}</p>
         </div>
         <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm border-l-4 border-red-500">
-          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Voided</span>
+          <span class="text-[10px] sm:text-xs font-semibold uppercase text-gray-500">Void Total</span>
           <p class="text-lg sm:text-xl font-bold text-gray-800">RM {{ reportStats.voidTotal.toFixed(2) }}</p>
         </div>
       </div>
 
-      <!-- TOP 5 DISHES & PAYMENT METHODS -->
+      <!-- PEAK HOURS (24-HOUR TIME DISTRIBUTION) CHART -->
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-3">
+        <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+          <i class="fas fa-clock text-amber-500"></i> Peak Sales Hours Distribution (24H Traffic)
+        </h3>
+        <div class="grid grid-cols-12 md:grid-cols-24 gap-1 items-end h-32 pt-6 pb-2 px-2 bg-gray-50 rounded-xl overflow-x-auto">
+          <div v-for="h in hourlySales" :key="h.hour" class="flex flex-col items-center flex-1 h-full justify-end group relative min-w-[20px]">
+            <div class="text-[9px] font-bold text-amber-600 mb-1 opacity-0 group-hover:opacity-100 transition absolute -top-5">RM {{ h.total.toFixed(0) }}</div>
+            <div 
+              class="w-full bg-amber-400 hover:bg-amber-500 rounded-t transition-all"
+              :style="{ height: (maxHourlyTotal > 0 ? (h.total / maxHourlyTotal * 100) : 0) + '%' }"
+            ></div>
+            <span class="text-[9px] text-gray-500 mt-1 font-mono">{{ h.hour.toString().padStart(2, '0') }}</span>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-400 text-right">* Shows peak revenue times of the day (Hover bar for revenue amount).</p>
+      </div>
+
+      <!-- TOP 10 DISHES & CLEAN PAYMENT METHOD BREAKDOWN -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <!-- TOP 10 DISHES -->
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm lg:col-span-2 space-y-3">
           <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <i class="fas fa-trophy text-amber-500"></i> Top 5 Best-Selling Dishes
+            <i class="fas fa-trophy text-amber-500"></i> Top 10 Best-Selling Dishes
           </h3>
-          <div class="space-y-2">
-            <div v-for="(item, idx) in top5Dishes" :key="idx" class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs sm:text-sm">
-              <div class="flex items-center gap-2">
-                <span class="w-5 h-5 rounded-full bg-amber-400 text-white flex items-center justify-center font-bold text-[10px]">{{ idx + 1 }}</span>
-                <div>
-                  <p class="font-bold text-gray-800">{{ item.name }}</p>
-                  <p class="text-[10px] text-gray-500">Qty: {{ item.qty }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div v-for="(item, idx) in top10Dishes" :key="idx" class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl text-xs sm:text-sm">
+              <div class="flex items-center gap-2 overflow-hidden pr-2">
+                <span :class="['w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0', idx < 3 ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-700']">{{ idx + 1 }}</span>
+                <div class="truncate">
+                  <p class="font-bold text-gray-800 truncate">{{ item.name }}</p>
+                  <p class="text-[10px] text-gray-500">Qty Sold: {{ item.qty }}</p>
                 </div>
               </div>
-              <span class="font-bold text-gray-800">RM {{ item.totalRev.toFixed(2) }}</span>
+              <span class="font-bold text-gray-800 shrink-0">RM {{ item.totalRev.toFixed(2) }}</span>
             </div>
-            <div v-if="top5Dishes.length === 0" class="text-center py-4 text-gray-400 text-xs">No sales data.</div>
+            <div v-if="top10Dishes.length === 0" class="col-span-2 text-center py-6 text-gray-400 text-xs">No sales data.</div>
           </div>
         </div>
 
+        <!-- PAYMENT METHOD SUMMARY (Normalized) -->
         <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-3">
           <h3 class="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
             <i class="fas fa-wallet text-amber-500"></i> Payment Distribution
           </h3>
           <div class="space-y-2">
-            <div v-for="(val, method) in paymentBreakdown" :key="method" class="flex justify-between items-center p-1.5 border-b text-xs">
-              <span class="font-semibold text-gray-700">{{ method }}</span>
-              <span class="font-mono font-bold text-gray-900">RM {{ val.toFixed(2) }}</span>
+            <div v-for="method in allowedPaymentMethods" :key="method" class="flex justify-between items-center p-2 border-b text-xs">
+              <div class="flex items-center gap-2">
+                <i :class="getPaymentIcon(method)" class="text-gray-400 text-sm"></i>
+                <span class="font-semibold text-gray-700">{{ method }}</span>
+              </div>
+              <span class="font-mono font-bold text-gray-900">RM {{ (paymentBreakdown[method] || 0).toFixed(2) }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- INVOICE LEDGER TABLE (RESPONSIVE DESKTOP TABLE / MOBILE CARDS) -->
+      <!-- MAIN REPORT TABS (Invoices Log / Daily Sales / Monthly Sales / Yearly Sales) -->
       <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
-          <h3 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-list-alt text-amber-500"></i> Invoices Log ({{ filteredLogs.length }})
-          </h3>
-          <input type="text" v-model="searchLog" placeholder="Search Check#, Table..." class="px-3 py-1.5 border rounded-lg text-xs outline-none w-full sm:w-64" />
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+          <!-- Report Type Switcher -->
+          <div class="flex bg-gray-100 p-1 rounded-xl text-xs w-full sm:w-auto overflow-x-auto">
+            <button v-for="t in [{ id: 'invoices', label: 'Invoices Log' }, { id: 'daily', label: 'Daily Sales' }, { id: 'monthly', label: 'Monthly Sales' }, { id: 'yearly', label: 'Yearly Sales' }]" :key="t.id" @click="reportViewType = t.id" :class="['px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap', reportViewType === t.id ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-600']">
+              {{ t.label }}
+            </button>
+          </div>
+
+          <input v-if="reportViewType === 'invoices'" type="text" v-model="searchLog" placeholder="Search Check#, Table, Items..." class="px-3 py-1.5 border rounded-lg text-xs outline-none w-full sm:w-64" />
         </div>
 
-        <!-- Desktop Table View -->
-        <div class="hidden md:block overflow-x-auto border rounded-xl">
+        <!-- VIEW 1: INVOICES LOG TABLE -->
+        <div v-if="reportViewType === 'invoices'">
+          <div class="hidden md:block overflow-x-auto border rounded-xl">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
+                  <th class="p-3 border-r">Date</th>
+                  <th class="p-3 border-r">Check #</th>
+                  <th class="p-3 border-r">Table</th>
+                  <th class="p-3 border-r">Status</th>
+                  <th class="p-3 border-r">Method</th>
+                  <th class="p-3 border-r w-1/3">Items Summary</th>
+                  <th class="p-3 border-r text-right">Subtotal</th>
+                  <th class="p-3 border-r text-right">Service Charge (10%)</th>
+                  <th class="p-3 border-r text-right">Total</th>
+                  <th class="p-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <tr v-for="log in filteredLogs" :key="log.id" :class="['hover:bg-amber-50/40 transition', log.status === 'Void' ? 'bg-red-50/40 text-red-700' : '']">
+                  <td class="p-3 border-r font-mono text-gray-600 whitespace-nowrap">{{ formatFullDateTime(log.created_at) }}</td>
+                  <td class="p-3 border-r font-bold text-amber-600 whitespace-nowrap">{{ log.check_no || `CHK-${log.id}` }}</td>
+                  <td class="p-3 border-r font-bold">T-{{ log.table_no }}</td>
+                  <td class="p-3 border-r"><span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span></td>
+                  <td class="p-3 border-r font-semibold whitespace-nowrap">{{ log.pay_method }}</td>
+                  <td class="p-3 border-r">
+                    <div class="space-y-1">
+                      <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded text-[11px]">
+                        <span><strong class="text-amber-600">x{{ item.qty }}</strong> {{ item.name }}</span>
+                        <span class="text-gray-500 font-mono">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="p-3 border-r text-right font-mono text-gray-700">RM {{ getLogSubtotal(log).toFixed(2) }}</td>
+                  <td class="p-3 border-r text-right font-mono text-gray-500">RM {{ (getLogSubtotal(log) * 0.10).toFixed(2) }}</td>
+                  <td class="p-3 border-r text-right font-mono font-bold text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</td>
+                  <td class="p-3 text-center">
+                    <button @click="openReprintModal(log)" class="px-3 py-1 bg-amber-500 text-white rounded font-bold shadow-sm text-xs">Reprint</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Invoice Cards -->
+          <div class="md:hidden space-y-3">
+            <div v-for="log in filteredLogs" :key="log.id" class="p-3 border rounded-xl space-y-2 bg-gray-50">
+              <div class="flex justify-between items-center border-b pb-2 text-xs">
+                <div>
+                  <span class="font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</span>
+                  <span class="font-bold ml-2">T-{{ log.table_no }}</span>
+                </div>
+                <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span>
+              </div>
+              <div class="space-y-1 text-xs">
+                <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between">
+                  <span class="text-gray-700">x{{ item.qty }} {{ item.name }}</span>
+                  <span class="font-mono text-gray-500">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
+                </div>
+              </div>
+              <div class="flex justify-between items-center border-t pt-2 text-xs">
+                <span class="text-gray-500">{{ log.pay_method }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-sm text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</span>
+                  <button @click="openReprintModal(log)" class="px-2.5 py-1 bg-amber-500 text-white rounded font-bold text-[11px]">Print</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: DAILY SALES REPORT -->
+        <div v-if="reportViewType === 'daily'" class="overflow-x-auto border rounded-xl">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
                 <th class="p-3 border-r">Date</th>
-                <th class="p-3 border-r">Check #</th>
-                <th class="p-3 border-r">Table</th>
-                <th class="p-3 border-r">Status</th>
-                <th class="p-3 border-r">Method</th>
-                <th class="p-3 border-r w-2/5">Line Items</th>
-                <th class="p-3 border-r text-right">Total</th>
-                <th class="p-3 text-center">Action</th>
+                <th class="p-3 border-r text-center">Checks</th>
+                <th class="p-3 border-r text-right">Cash</th>
+                <th class="p-3 border-r text-right">QR Pay</th>
+                <th class="p-3 border-r text-right">Visa Card</th>
+                <th class="p-3 border-r text-right">Master Card</th>
+                <th class="p-3 border-r text-right">Debit Card</th>
+                <th class="p-3 border-r text-right">Service Charge (10%)</th>
+                <th class="p-3 text-right">Total Revenue</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="log in filteredLogs" :key="log.id" :class="['hover:bg-amber-50/40 transition', log.status === 'Void' ? 'bg-red-50/40 text-red-700' : '']">
-                <td class="p-3 border-r font-mono text-gray-600">{{ formatFullDateTime(log.created_at) }}</td>
-                <td class="p-3 border-r font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</td>
-                <td class="p-3 border-r font-bold">T-{{ log.table_no }}</td>
-                <td class="p-3 border-r"><span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span></td>
-                <td class="p-3 border-r font-semibold">{{ log.pay_method || 'Cash' }}</td>
-                <td class="p-3 border-r">
-                  <div class="space-y-1">
-                    <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded text-[11px]">
-                      <span><strong class="text-amber-600">x{{ item.qty }}</strong> {{ item.name }}</span>
-                      <span class="text-gray-500 font-mono">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
-                    </div>
-                  </div>
-                </td>
-                <td class="p-3 border-r text-right font-mono font-bold text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</td>
-                <td class="p-3 text-center">
-                  <button @click="openReprintModal(log)" class="px-3 py-1 bg-amber-500 text-white rounded font-bold shadow-sm text-xs">Reprint</button>
-                </td>
+            <tbody class="divide-y divide-gray-200 font-mono">
+              <tr v-for="row in aggregatedDailyReport" :key="row.period" class="hover:bg-amber-50/40">
+                <td class="p-3 border-r font-bold font-sans text-gray-800">{{ row.period }}</td>
+                <td class="p-3 border-r text-center font-bold text-amber-600">{{ row.count }}</td>
+                <td class="p-3 border-r text-right">RM {{ row.Cash.toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['QR Pay'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Visa Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Master Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Debit Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right text-gray-500">RM {{ row.serviceCharge.toFixed(2) }}</td>
+                <td class="p-3 text-right font-bold text-gray-900 bg-amber-50/30">RM {{ row.total.toFixed(2) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Mobile Responsive Cards View -->
-        <div class="md:hidden space-y-3">
-          <div v-for="log in filteredLogs" :key="log.id" class="p-3 border rounded-xl space-y-2 bg-gray-50">
-            <div class="flex justify-between items-center border-b pb-2 text-xs">
-              <div>
-                <span class="font-bold text-amber-600">{{ log.check_no || `CHK-${log.id}` }}</span>
-                <span class="font-bold ml-2">T-{{ log.table_no }}</span>
-              </div>
-              <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase', log.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700']">{{ log.status }}</span>
-            </div>
-            <div class="space-y-1 text-xs">
-              <div v-for="(item, iIdx) in (log.items || [])" :key="iIdx" class="flex justify-between">
-                <span class="text-gray-700">x{{ item.qty }} {{ item.name }}</span>
-                <span class="font-mono text-gray-500">RM {{ (Number(item.price) * Number(item.qty)).toFixed(2) }}</span>
-              </div>
-            </div>
-            <div class="flex justify-between items-center border-t pt-2 text-xs">
-              <span class="text-gray-500">{{ log.pay_method || 'Cash' }}</span>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-sm text-gray-900">RM {{ getLogTotal(log).toFixed(2) }}</span>
-                <button @click="openReprintModal(log)" class="px-2.5 py-1 bg-amber-500 text-white rounded font-bold text-[11px]">Print</button>
-              </div>
-            </div>
-          </div>
+        <!-- VIEW 3: MONTHLY SALES REPORT -->
+        <div v-if="reportViewType === 'monthly'" class="overflow-x-auto border rounded-xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
+                <th class="p-3 border-r">Month</th>
+                <th class="p-3 border-r text-center">Checks</th>
+                <th class="p-3 border-r text-right">Cash</th>
+                <th class="p-3 border-r text-right">QR Pay</th>
+                <th class="p-3 border-r text-right">Visa Card</th>
+                <th class="p-3 border-r text-right">Master Card</th>
+                <th class="p-3 border-r text-right">Debit Card</th>
+                <th class="p-3 border-r text-right">Service Charge (10%)</th>
+                <th class="p-3 text-right">Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 font-mono">
+              <tr v-for="row in aggregatedMonthlyReport" :key="row.period" class="hover:bg-amber-50/40">
+                <td class="p-3 border-r font-bold font-sans text-gray-800">{{ row.period }}</td>
+                <td class="p-3 border-r text-center font-bold text-amber-600">{{ row.count }}</td>
+                <td class="p-3 border-r text-right">RM {{ row.Cash.toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['QR Pay'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Visa Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Master Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Debit Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right text-gray-500">RM {{ row.serviceCharge.toFixed(2) }}</td>
+                <td class="p-3 text-right font-bold text-gray-900 bg-amber-50/30">RM {{ row.total.toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- VIEW 4: YEARLY SALES REPORT -->
+        <div v-if="reportViewType === 'yearly'" class="overflow-x-auto border rounded-xl">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700 font-bold border-b text-[11px] uppercase">
+                <th class="p-3 border-r">Year</th>
+                <th class="p-3 border-r text-center">Checks</th>
+                <th class="p-3 border-r text-right">Cash</th>
+                <th class="p-3 border-r text-right">QR Pay</th>
+                <th class="p-3 border-r text-right">Visa Card</th>
+                <th class="p-3 border-r text-right">Master Card</th>
+                <th class="p-3 border-r text-right">Debit Card</th>
+                <th class="p-3 border-r text-right">Service Charge (10%)</th>
+                <th class="p-3 text-right">Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 font-mono">
+              <tr v-for="row in aggregatedYearlyReport" :key="row.period" class="hover:bg-amber-50/40">
+                <td class="p-3 border-r font-bold font-sans text-gray-800">{{ row.period }}</td>
+                <td class="p-3 border-r text-center font-bold text-amber-600">{{ row.count }}</td>
+                <td class="p-3 border-r text-right">RM {{ row.Cash.toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['QR Pay'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Visa Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Master Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right">RM {{ row['Debit Card'].toFixed(2) }}</td>
+                <td class="p-3 border-r text-right text-gray-500">RM {{ row.serviceCharge.toFixed(2) }}</td>
+                <td class="p-3 text-right font-bold text-gray-900 bg-amber-50/30">RM {{ row.total.toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
       </div>
 
     </div>
 
-    <!-- REPRINT PRINTER SELECTION MODAL -->
+    <!-- REPRINT MODAL -->
     <div v-if="showReprintModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
         <div class="flex justify-between items-center border-b pb-2">
@@ -449,8 +573,8 @@
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
-          <div class="grid grid-cols-3 gap-2">
-            <button v-for="m in ['Cash', 'QR Pay', 'Visa', 'Master', 'Debit']" :key="m" @click="selectedPayMethod = m" :class="['py-2 text-xs font-bold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 border-gray-200 text-gray-700']">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button v-for="m in allowedPaymentMethods" :key="m" @click="selectedPayMethod = m" :class="['py-2 text-xs font-bold rounded-lg border transition', selectedPayMethod === m ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 border-gray-200 text-gray-700']">
               {{ m }}
             </button>
           </div>
@@ -512,9 +636,11 @@
     createApp({
       setup() {
         const activeTab = ref('tables');
-        const tableViewMode = ref(window.innerWidth < 768 ? 'grid' : 'canvas'); // 手机默认Grid，电脑默认2D
+        const tableViewMode = ref(window.innerWidth < 768 ? 'grid' : 'canvas');
         const isEditingItems = ref(false);
         const isEditLayout = ref(false);
+
+        const allowedPaymentMethods = ['Cash', 'QR Pay', 'Visa Card', 'Master Card', 'Debit Card'];
 
         const dbTables = ref([
           { table_no: 'A01', pos_x: 30, pos_y: 30, width: 110, height: 100, shape: 'square' },
@@ -533,11 +659,12 @@
         const loading = ref(false);
 
         const reportPreset = ref('today');
+        const reportViewType = ref('invoices'); // invoices, daily, monthly, yearly
         const startDate = ref(new Date().toISOString().split('T')[0]);
         const endDate = ref(new Date().toISOString().split('T')[0]);
         const searchLog = ref('');
         const rawReportOrders = ref([]);
-        const reportStats = ref({ totalRevenue: 0, totalTax: 0, totalOrders: 0, avgTicket: 0, voidTotal: 0, voidCount: 0 });
+        const reportStats = ref({ totalRevenue: 0, totalTax: 0, totalOrders: 0, voidTotal: 0, voidCount: 0 });
 
         const showReprintModal = ref(false);
         const targetReprintLog = ref(null);
@@ -559,6 +686,25 @@
         const showMoveModal = ref(false);
         const moveType = ref('transfer');
         const targetTableNo = ref('');
+
+        const normalizePayMethod = (method) => {
+          if (!method) return 'Cash';
+          const m = method.toLowerCase();
+          if (m.includes('qr') || m.includes('tng') || m.includes('touch')) return 'QR Pay';
+          if (m.includes('visa')) return 'Visa Card';
+          if (m.includes('master')) return 'Master Card';
+          if (m.includes('debit')) return 'Debit Card';
+          return 'Cash';
+        };
+
+        const getPaymentIcon = (method) => {
+          if (method === 'Cash') return 'fas fa-money-bill-wave';
+          if (method === 'QR Pay') return 'fas fa-qrcode';
+          if (method === 'Visa Card') return 'fab fa-cc-visa';
+          if (method === 'Master Card') return 'fab fa-cc-mastercard';
+          if (method === 'Debit Card') return 'fas fa-credit-card';
+          return 'fas fa-wallet';
+        };
 
         const initSupabase = () => {
           if (!supabaseClient) supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -638,10 +784,10 @@
             else if (o.status === 'Void') { voidAmt += total; voidCnt++; }
           });
 
-          reportStats.value = { totalRevenue: rev, totalTax: tax, totalOrders: count, avgTicket: count > 0 ? rev / count : 0, voidTotal: voidAmt, voidCount: voidCnt };
+          reportStats.value = { totalRevenue: rev, totalTax: tax, totalOrders: count, voidTotal: voidAmt, voidCount: voidCnt };
         };
 
-        const top5Dishes = computed(() => {
+        const top10Dishes = computed(() => {
           const dishMap = {};
           rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
             (o.items || []).forEach(item => {
@@ -653,25 +799,63 @@
               dishMap[name].totalRev += price * q;
             });
           });
-          return Object.values(dishMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+          return Object.values(dishMap).sort((a, b) => b.qty - a.qty).slice(0, 10);
         });
 
         const paymentBreakdown = computed(() => {
-          const map = { Cash: 0, 'QR Pay': 0, Visa: 0, Master: 0, Debit: 0 };
+          const map = { Cash: 0, 'QR Pay': 0, 'Visa Card': 0, 'Master Card': 0, 'Debit Card': 0 };
           rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
-            const method = o.pay_method || 'Cash';
+            const method = normalizePayMethod(o.pay_method);
             map[method] = (map[method] || 0) + getLogTotal(o);
           });
           return map;
         });
 
+        const hourlySales = computed(() => {
+          const hours = Array.from({ length: 24 }, (_, i) => ({ hour: i, total: 0 }));
+          rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
+            if (o.created_at) {
+              const h = new Date(o.created_at).getHours();
+              hours[h].total += getLogTotal(o);
+            }
+          });
+          return hours;
+        });
+
+        const maxHourlyTotal = computed(() => Math.max(...hourlySales.value.map(h => h.total), 1));
+
         const filteredLogs = computed(() => {
-          return rawReportOrders.value.filter(o => {
+          return rawReportOrders.value.map(o => ({
+            ...o,
+            pay_method: normalizePayMethod(o.pay_method)
+          })).filter(o => {
             const q = searchLog.value.toLowerCase();
             const itemsStr = (o.items || []).map(i => i.name).join(' ').toLowerCase();
             return !q || (o.check_no && o.check_no.toLowerCase().includes(q)) || (o.table_no && o.table_no.toLowerCase().includes(q)) || itemsStr.includes(q);
           });
         });
+
+        const aggregateReport = (keyFormatter) => {
+          const map = {};
+          rawReportOrders.value.filter(o => o.status === 'Paid').forEach(o => {
+            const key = keyFormatter(new Date(o.created_at || Date.now()));
+            if (!map[key]) {
+              map[key] = { period: key, count: 0, Cash: 0, 'QR Pay': 0, 'Visa Card': 0, 'Master Card': 0, 'Debit Card': 0, serviceCharge: 0, total: 0 };
+            }
+            const total = getLogTotal(o);
+            const sub = getLogSubtotal(o);
+            const method = normalizePayMethod(o.pay_method);
+            map[key].count++;
+            map[key][method] += total;
+            map[key].serviceCharge += sub * 0.10;
+            map[key].total += total;
+          });
+          return Object.values(map).sort((a, b) => b.period.localeCompare(a.period));
+        };
+
+        const aggregatedDailyReport = computed(() => aggregateReport(d => d.toISOString().split('T')[0]));
+        const aggregatedMonthlyReport = computed(() => aggregateReport(d => `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`));
+        const aggregatedYearlyReport = computed(() => aggregateReport(d => `${d.getFullYear()}`));
 
         const getLogSubtotal = (o) => (o.items || []).reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.qty || 1)), 0);
         const getLogTotal = (o) => getLogSubtotal(o) * 1.10;
@@ -697,7 +881,7 @@
             table_no: log.table_no,
             printer_ip: targetIp,
             printer_target_ip: targetIp,
-            content: { check_no: checkNo, items: log.items || [], subtotal: getLogSubtotal(log), total: getLogTotal(log), pay_method: log.pay_method || 'Cash', created_at: log.created_at, is_reprint: true }
+            content: { check_no: checkNo, items: log.items || [], subtotal: getLogSubtotal(log), total: getLogTotal(log), pay_method: log.pay_method, created_at: log.created_at, is_reprint: true }
           });
 
           showReprintModal.value = false;
@@ -705,10 +889,10 @@
         };
 
         const exportToCSV = () => {
-          let csv = "Date,Check No,Table,Status,Method,Items Summary,Subtotal,Tax,Total\n";
+          let csv = "Date,Check No,Table,Status,Method,Items Summary,Subtotal,Service Charge (10%),Total\n";
           filteredLogs.value.forEach(o => {
             const itemsStr = `"${(o.items || []).map(i => `${i.qty}x ${i.name}`).join('; ')}"`;
-            csv += `"${formatFullDateTime(o.created_at)}","${o.check_no || 'CHK-' + o.id}","T-${o.table_no}","${o.status}","${o.pay_method || 'Cash'}",${itemsStr},${getLogSubtotal(o).toFixed(2)},${(getLogSubtotal(o)*0.1).toFixed(2)},${getLogTotal(o).toFixed(2)}\n`;
+            csv += `"${formatFullDateTime(o.created_at)}","${o.check_no || 'CHK-' + o.id}","T-${o.table_no}","${o.status}","${o.pay_method}",${itemsStr},${getLogSubtotal(o).toFixed(2)},${(getLogSubtotal(o)*0.1).toFixed(2)},${getLogTotal(o).toFixed(2)}\n`;
           });
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement("a");
@@ -826,9 +1010,10 @@
 
         return {
           activeTab, tableViewMode, isEditingItems, isEditLayout, dbTables, allOrders, menuList, selectedTable, loading,
-          reportPreset, startDate, endDate, searchLog, reportStats, top5Dishes, paymentBreakdown, filteredLogs,
+          reportPreset, reportViewType, startDate, endDate, searchLog, reportStats, top10Dishes, paymentBreakdown, hourlySales, maxHourlyTotal,
+          filteredLogs, aggregatedDailyReport, aggregatedMonthlyReport, aggregatedYearlyReport, allowedPaymentMethods,
           showReprintModal, targetReprintLog, selectedPrinterId, printerOptions,
-          setReportPreset, switchToReports, fetchReportData, getLogSubtotal, getLogTotal, formatFullDateTime,
+          setReportPreset, switchToReports, fetchReportData, getLogSubtotal, getLogTotal, formatFullDateTime, getPaymentIcon,
           openReprintModal, executeReprint, exportToCSV, printCurrentReport,
           showPaymentModal, selectedPayMethod, cashReceived, cashChange, currentTableTotal,
           showPasswordModal, staffPassword, showMoveModal, moveType, targetTableNo, availableTargetTables,
