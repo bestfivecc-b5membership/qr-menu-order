@@ -1,47 +1,166 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>扫码点餐</title>
+  <title>B5 Cuisine Cafe - QR Ordering System</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Vue 3 -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <!-- Supabase JS Official SDK (固定版本与双源加载) -->
+  <!-- Supabase JS Official SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     [v-cloak] { display: none !important; }
   </style>
 </head>
-<body class="bg-gray-100 pb-24">
+<body class="bg-gray-100 min-h-screen">
 
-<div id="app" v-cloak class="max-w-md mx-auto min-h-screen bg-white relative shadow-lg">
+<div id="app" v-cloak class="max-w-md mx-auto min-h-screen bg-white relative shadow-lg pb-24">
 
-  <!-- 顶部 Header -->
-  <header class="bg-amber-600 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow">
-    <div>
-      <h1 class="text-xl font-bold">扫码点餐系统</h1>
-      <p class="text-xs opacity-90">当前桌号: <span class="text-yellow-200 font-bold text-base">{{ currentTable }}</span></p>
-    </div>
-    <div class="text-xs bg-amber-700 px-2 py-1 rounded">
-      {{ orderType === 'Dine-In' ? '🍽️ 堂食' : '🛍️ 外带' }}
-    </div>
-  </header>
-
-  <!-- 错误提示 -->
-  <div v-if="errorMessage" class="p-4 m-4 bg-red-100 border border-red-400 text-red-700 text-sm rounded">
-    ❌ {{ errorMessage }}
+  <!-- Toast Notification -->
+  <div v-if="toast.show" 
+       :class="['fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-xl shadow-2xl text-sm font-bold text-white transition-all transform duration-300 flex items-center gap-2 max-w-[90%]',
+               toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600']">
+    <span>{{ toast.type === 'error' ? '❌' : '✅' }}</span>
+    <span>{{ toast.message }}</span>
   </div>
 
-  <!-- 加载中提示 -->
-  <div v-if="loading && !errorMessage" class="p-8 text-center text-gray-500">
-    ⏳ 菜单加载中，请稍候...
+  <!-- Loading Message (验证 Token/ Session 中) -->
+  <div v-if="loading && !errorMessage" class="min-h-screen flex flex-col items-center justify-center p-8 text-center text-gray-500">
+    <div class="inline-block animate-spin text-4xl mb-3">⏳</div>
+    <div class="font-medium text-sm text-gray-600">Validating table session & loading menu...</div>
   </div>
 
-  <template v-if="!loading && !errorMessage">
-    <!-- 分类标签页 -->
-    <div class="flex overflow-x-auto bg-gray-50 border-b border-gray-200 sticky top-[60px] z-10 p-2 gap-2">
+  <!-- Error Message (失效或无效二维码拦截) -->
+  <div v-if="errorMessage" class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full bg-red-50 border border-red-200 text-red-700 text-center rounded-2xl shadow-sm p-6 space-y-3">
+      <div class="text-5xl">⚠️</div>
+      <div class="font-extrabold text-lg">Unable to Order</div>
+      <div class="text-xs text-red-500">{{ errorMessage }}</div>
+      <button @click="location.reload()" class="mt-2 bg-red-600 text-white text-xs px-5 py-2.5 rounded-xl font-bold active:scale-95 transition">Refresh Page</button>
+    </div>
+  </div>
+
+  <!-- STEP 1: 全屏开桌确认界面 (只有扫码成功且尚未点击 Start Ordering 时显示) -->
+  <div v-if="!loading && !errorMessage && !sessionConfirmed" class="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl space-y-6 text-center border border-gray-100">
+      <div>
+        <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 shadow-inner">
+          ☕
+        </div>
+        <h2 class="font-extrabold text-2xl text-gray-800">Welcome to B5 Cuisine Cafe</h2>
+        <p class="text-xs text-gray-500 mt-1">
+          Table No: <span class="bg-amber-100 text-amber-800 px-3 py-0.5 rounded-full font-bold text-base inline-block ml-1">{{ currentTable }}</span>
+        </p>
+      </div>
+
+      <!-- 选择 Dine-In 或 Takeaway -->
+      <div class="text-left space-y-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Select Dining Option</label>
+        <div class="grid grid-cols-2 gap-3">
+          <button 
+            type="button" 
+            @click="orderType = 'Dine-In'"
+            :class="['py-3.5 px-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition-all',
+                    orderType === 'Dine-In' ? 'border-amber-600 bg-amber-50 text-amber-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600']">
+            🍽️ Dine-In
+          </button>
+          <button 
+            type="button" 
+            @click="orderType = 'Takeaway'"
+            :class="['py-3.5 px-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition-all',
+                    orderType === 'Takeaway' ? 'border-amber-600 bg-amber-50 text-amber-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600']">
+            🛍️ Takeaway
+          </button>
+        </div>
+      </div>
+
+      <!-- 选择用餐人数 Pax -->
+      <div class="text-left space-y-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider">Number of Guests (Pax)</label>
+        <div class="flex items-center justify-between bg-gray-50 rounded-xl p-2 border border-gray-200">
+          <button @click="pax = Math.max(1, pax - 1)" class="w-11 h-11 bg-white rounded-lg font-bold text-xl text-gray-700 shadow-sm active:bg-gray-100 border flex items-center justify-center">-</button>
+          <span class="font-extrabold text-lg text-gray-800">{{ pax }} Guests</span>
+          <button @click="pax++" class="w-11 h-11 bg-white rounded-lg font-bold text-xl text-gray-700 shadow-sm active:bg-gray-100 border flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 确认进入菜单按钮 -->
+      <button 
+        @click="confirmSession"
+        class="w-full bg-amber-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-amber-700 active:scale-95 transition text-base flex items-center justify-center gap-2">
+        <span>Start Ordering</span>
+        <span>➔</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2: 菜单与点餐页面 (确认开桌后解锁展示) -->
+  <template v-if="!loading && !errorMessage && sessionConfirmed">
+    
+    <!-- Header -->
+    <header class="bg-amber-600 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-md">
+      <div>
+        <h1 class="text-xl font-bold">B5 Cuisine Cafe</h1>
+        <p class="text-xs opacity-90">Table No: <span class="text-yellow-200 font-bold text-base">{{ currentTable }}</span></p>
+      </div>
+      <!-- 状态标签：点击可重新打开开桌设置弹窗修改人数/模式 -->
+      <button 
+        @click="showSessionModal = true" 
+        class="text-xs bg-amber-700 hover:bg-amber-800 px-3 py-1.5 rounded-full font-medium shadow flex items-center gap-1.5 border border-amber-500 active:scale-95 transition">
+        <span>{{ orderType === 'Dine-In' ? '🍽️ Dine-In' : '🛍️ Takeaway' }} ({{ pax }}P)</span>
+        <span class="text-[10px] opacity-80">✏️</span>
+      </button>
+    </header>
+
+    <!-- Header 内的修改开桌 Modal (点餐过程中点击 Header 按钮时弹出) -->
+    <div v-if="showSessionModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-5 text-center">
+        <div>
+          <h3 class="font-extrabold text-xl text-gray-800">Update Session Setup</h3>
+          <p class="text-xs text-gray-500 mt-1">Table No: <span class="text-amber-600 font-bold text-base">{{ currentTable }}</span></p>
+        </div>
+
+        <div class="text-left space-y-2">
+          <label class="block text-xs font-bold text-gray-500">Dining Option</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button 
+              type="button" 
+              @click="orderType = 'Dine-In'"
+              :class="['py-3 px-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-1 transition',
+                      orderType === 'Dine-In' ? 'border-amber-600 bg-amber-50 text-amber-600 shadow' : 'border-gray-200 bg-white text-gray-600']">
+              🍽️ Dine-In
+            </button>
+            <button 
+              type="button" 
+              @click="orderType = 'Takeaway'"
+              :class="['py-3 px-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-1 transition',
+                      orderType === 'Takeaway' ? 'border-amber-600 bg-amber-50 text-amber-600 shadow' : 'border-gray-200 bg-white text-gray-600']">
+              🛍️ Takeaway
+            </button>
+          </div>
+        </div>
+
+        <div class="text-left space-y-2">
+          <label class="block text-xs font-bold text-gray-500">Number of Guests (Pax)</label>
+          <div class="flex items-center justify-between bg-gray-100 rounded-xl p-2 border border-gray-200">
+            <button @click="pax = Math.max(1, pax - 1)" class="w-10 h-10 bg-white rounded-lg font-bold text-xl text-gray-700 shadow-sm active:bg-gray-200 flex items-center justify-center">-</button>
+            <span class="font-bold text-base text-gray-800">{{ pax }} Guests</span>
+            <button @click="pax++" class="w-10 h-10 bg-white rounded-lg font-bold text-xl text-gray-700 shadow-sm active:bg-gray-200 flex items-center justify-center">+</button>
+          </div>
+        </div>
+
+        <button 
+          @click="showSessionModal = false"
+          class="w-full bg-amber-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-amber-700 active:scale-95 transition">
+          Save & Continue
+        </button>
+      </div>
+    </div>
+
+    <!-- Dynamic Category & Tags Navigation Bar -->
+    <div class="flex overflow-x-auto bg-gray-50 border-b border-gray-200 sticky top-[60px] z-10 p-2 gap-2 scrollbar-none">
       <button 
         v-for="cat in categories" 
         :key="cat"
@@ -52,55 +171,193 @@
       </button>
     </div>
 
-    <!-- 菜品列表 -->
+    <!-- Menu Item List -->
     <div class="p-4 space-y-4">
-      <div v-if="filteredMenu.length === 0" class="text-center py-8 text-gray-400">
-        该分类下暂无菜品
+      <div v-if="filteredMenu.length === 0" class="text-center py-12 text-gray-400">
+        No items available in this section.
       </div>
 
       <div v-for="item in filteredMenu" :key="item.id" class="flex gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
         <img :src="item.image_url || 'https://via.placeholder.com/100?text=Food'" class="w-20 h-20 rounded-lg object-cover bg-gray-100" />
         <div class="flex-1 flex flex-col justify-between">
           <div>
-            <h3 class="font-bold text-gray-800">{{ item.name }}</h3>
-            <p class="text-xs text-gray-400 line-clamp-1">{{ item.description }}</p>
+            <h3 class="font-bold text-gray-800 text-sm">{{ item.name }}</h3>
+            <p class="text-xs text-gray-400 line-clamp-1 mt-0.5">{{ item.description }}</p>
           </div>
           <div class="flex justify-between items-center mt-2">
-            <span class="text-amber-600 font-bold">RM {{ Number(item.price).toFixed(2) }}</span>
+            <span class="text-amber-600 font-bold text-sm">RM {{ Number(item.price).toFixed(2) }}</span>
             <button 
-              @click="addToCart(item)"
+              @click="handleAddToCart(item)"
               :disabled="!item.is_available"
               :class="['px-3 py-1 rounded-lg text-xs font-bold transition', 
-                      item.is_available ? 'bg-amber-600 text-white active:scale-95' : 'bg-gray-200 text-gray-400']">
-              {{ item.is_available ? '+ 加购' : '售罄' }}
+                      item.is_available ? 'bg-amber-600 text-white active:scale-95 hover:bg-amber-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed']">
+              {{ item.is_available ? '+ Add' : 'Sold Out' }}
             </button>
           </div>
         </div>
       </div>
     </div>
-  </template>
 
-  <!-- 底部购物车 bar -->
-  <div v-if="cart.length > 0" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 p-3 flex justify-between items-center shadow-2xl z-20">
-    <div class="flex items-center gap-3">
-      <div class="relative">
-        <span class="text-2xl">🛒</span>
-        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-          {{ totalCartCount }}
-        </span>
+    <!-- Bottom Cart Bar -->
+    <div v-if="cart.length > 0" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 p-3 flex justify-between items-center shadow-2xl z-20">
+      <div @click="showCartModal = true" class="flex items-center gap-3 cursor-pointer">
+        <div class="relative">
+          <span class="text-2xl">🛒</span>
+          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+            {{ totalCartCount }}
+          </span>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500">View Cart (Tap to open)</div>
+          <div class="text-lg font-bold text-amber-600">RM {{ totalCartPrice.toFixed(2) }}</div>
+        </div>
       </div>
-      <div>
-        <div class="text-xs text-gray-500">合计总额</div>
-        <div class="text-lg font-bold text-amber-600">RM {{ totalCartPrice.toFixed(2) }}</div>
-      </div>
+
+      <button 
+        @click="showCheckoutModal = true" 
+        class="bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow hover:bg-amber-700 active:scale-95 transition flex items-center gap-2">
+        <span>Checkout ({{ totalCartCount }})</span>
+      </button>
     </div>
 
-    <button 
-      @click="submitOrder" 
-      :disabled="submitting"
-      class="bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow hover:bg-amber-700 active:scale-95 transition flex items-center gap-2">
-      <span>{{ submitting ? '提交中...' : '立即下单' }}</span>
-    </button>
+  </template>
+
+  <!-- Item Options Modal (规格选择弹窗) -->
+  <div v-if="showItemModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-lg text-gray-800">{{ selectedItem.name }}</h3>
+        <button @click="showItemModal = false" class="text-gray-400 text-xl font-bold px-2 hover:text-gray-600">✕</button>
+      </div>
+
+      <div class="text-sm font-semibold text-gray-700">Base Price: <span class="text-amber-600 font-bold">RM {{ Number(selectedItem.price || 0).toFixed(2) }}</span></div>
+
+      <!-- Dynamic Option Groups -->
+      <div v-for="group in activeOptionGroups" :key="group.id" class="space-y-1.5">
+        <label class="block text-xs font-bold text-gray-500">{{ group.name }}</label>
+        <div class="flex flex-wrap gap-2">
+          <button 
+            v-for="opt in group.options" 
+            :key="opt.id"
+            @click="selectOption(group.name, opt)"
+            :class="['py-1.5 px-3 text-xs rounded-lg border transition font-medium', 
+                    isSelected(group.name, opt) 
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-md font-bold' 
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50']">
+            {{ formatOptionLabel(opt) }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Special Instructions -->
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1">Special Instructions</label>
+        <input v-model="itemNote" type="text" placeholder="e.g. Less oil, no onion..." class="w-full p-2 text-sm border rounded bg-gray-50 focus:outline-none focus:border-amber-600">
+      </div>
+
+      <!-- Quantity Selector -->
+      <div class="flex justify-between items-center pt-2">
+        <span class="text-sm font-bold text-gray-700">Quantity</span>
+        <div class="flex items-center gap-3">
+          <button @click="decreaseModalQty" class="w-8 h-8 rounded bg-gray-200 font-bold text-gray-600 flex items-center justify-center hover:bg-gray-300">-</button>
+          <span class="font-bold text-sm w-4 text-center">{{ modalQty }}</span>
+          <button @click="modalQty++" class="w-8 h-8 rounded bg-amber-600 text-white font-bold flex items-center justify-center hover:bg-amber-700">+</button>
+        </div>
+      </div>
+
+      <!-- Confirm Button -->
+      <button @click="confirmAddToCart" class="w-full bg-amber-600 text-white py-2.5 rounded-xl font-bold shadow hover:bg-amber-700 transition active:scale-95">
+        Add to Cart - RM {{ (calculatedUnitPrice * modalQty).toFixed(2) }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Shopping Cart Modal (购物车列表弹窗) -->
+  <div v-if="showCartModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4 max-h-[80vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-lg text-gray-800">🛒 Cart Items</h3>
+        <button @click="showCartModal = false" class="text-gray-400 text-xl font-bold px-2 hover:text-gray-600">✕</button>
+      </div>
+
+      <div class="space-y-3">
+        <div v-for="(item, index) in cart" :key="index" class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+          <div class="flex-1 pr-2">
+            <div class="font-bold text-sm text-gray-800">{{ item.name }}</div>
+            <div class="text-xs text-gray-400 space-x-1">
+              <span v-if="item.selected_options">{{ item.selected_options }}</span>
+              <span v-if="item.note" class="text-amber-600">[{{ item.note }}]</span>
+            </div>
+            <div class="text-amber-600 font-bold text-xs mt-0.5">RM {{ (item.price * item.qty).toFixed(2) }}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="updateCartQty(index, -1)" class="w-6 h-6 bg-gray-200 rounded font-bold text-gray-600 flex items-center justify-center hover:bg-gray-300">-</button>
+            <span class="text-xs font-bold w-4 text-center">{{ item.qty }}</span>
+            <button @click="updateCartQty(index, 1)" class="w-6 h-6 bg-amber-600 text-white rounded font-bold flex items-center justify-center hover:bg-amber-700">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t pt-2 flex justify-between items-center">
+        <span class="font-bold text-gray-700">Total Amount</span>
+        <span class="text-lg font-bold text-amber-600">RM {{ totalCartPrice.toFixed(2) }}</span>
+      </div>
+
+      <button @click="showCartModal = false; showCheckoutModal = true" class="w-full bg-amber-600 text-white py-2.5 rounded-xl font-bold shadow hover:bg-amber-700 transition active:scale-95">
+        Proceed to Checkout
+      </button>
+    </div>
+  </div>
+
+  <!-- Checkout Modal (结算与支付选择弹窗) -->
+  <div v-if="showCheckoutModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-lg text-gray-800">💳 Select Payment Method</h3>
+        <button @click="showCheckoutModal = false" :disabled="submitting" class="text-gray-400 text-xl font-bold px-2 hover:text-gray-600">✕</button>
+      </div>
+
+      <div class="bg-amber-50 p-3 rounded-lg border border-amber-200 text-xs text-amber-800 space-y-1">
+        <p><b>Table:</b> {{ currentTable }} | <b>Type:</b> {{ orderType === 'Dine-In' ? 'Dine-In' : 'Takeaway' }} | <b>Pax:</b> {{ pax }}</p>
+        <p><b>Total Payable:</b> <span class="text-base font-bold text-amber-600">RM {{ totalCartPrice.toFixed(2) }}</span></p>
+      </div>
+
+      <div class="space-y-3">
+        <label @click="paymentMethod = 'counter'" :class="['flex items-center p-3 rounded-xl border cursor-pointer transition', paymentMethod === 'counter' ? 'border-amber-600 bg-amber-50' : 'border-gray-200']">
+          <input type="radio" name="pay" value="counter" v-model="paymentMethod" class="text-amber-600">
+          <div class="ml-3">
+            <div class="font-bold text-gray-800 text-sm">💵 Pay at Counter</div>
+            <div class="text-xs text-gray-400">Pay using Cash or Card at counter</div>
+          </div>
+        </label>
+
+        <label @click="paymentMethod = 'qr'" :class="['flex items-center p-3 rounded-xl border cursor-pointer transition', paymentMethod === 'qr' ? 'border-amber-600 bg-amber-50' : 'border-gray-200']">
+          <input type="radio" name="pay" value="qr" v-model="paymentMethod" class="text-amber-600">
+          <div class="ml-3">
+            <div class="font-bold text-gray-800 text-sm">📱 QR Pay Now</div>
+            <div class="text-xs text-gray-400">Scan using Touch 'n Go / DuitNow</div>
+          </div>
+        </label>
+      </div>
+
+      <div v-if="paymentMethod === 'qr'" class="p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center">
+        <p class="text-xs font-bold text-gray-700 mb-2">Scan to pay and present receipt to counter</p>
+        <img src="https://via.placeholder.com/150?text=DuitNow+QR+Code" class="w-28 h-28 mx-auto rounded object-contain bg-white border p-1 mb-1">
+      </div>
+
+      <!-- Anti-Double Submit Button -->
+      <button 
+        @click="submitOrder" 
+        :disabled="submitting || cart.length === 0"
+        :class="['w-full py-3 rounded-xl font-bold shadow transition flex justify-center items-center gap-2',
+                submitting || cart.length === 0 ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-amber-600 text-white hover:bg-amber-700 active:scale-95']">
+        <svg v-if="submitting" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>{{ submitting ? 'Submitting Order...' : `Confirm Order (RM ${totalCartPrice.toFixed(2)})` }}</span>
+      </button>
+    </div>
   </div>
 
 </div>
@@ -117,41 +374,157 @@
       const loading = ref(true);
       const submitting = ref(false);
       const errorMessage = ref('');
-      const activeCategory = ref('全部');
+      const activeCategory = ref('');
       const cart = ref([]);
-      const currentTable = ref('A01');
+      const currentTable = ref('--');
       const orderType = ref('Dine-In');
+      const pax = ref(2);
+
+      const sessionToken = ref('');
+      const sessionConfirmed = ref(false); // 强卡口控制：顾客是否已点击 Start Ordering
+      const showSessionModal = ref(false);
+
+      const showItemModal = ref(false);
+      const showCartModal = ref(false);
+      const showCheckoutModal = ref(false);
+      const selectedItem = ref({});
+      const modalQty = ref(1);
+      const paymentMethod = ref('counter');
+
+      const selectedCustoms = ref({});
+      const itemNote = ref('');
+
+      // Toast 提示框状态
+      const toast = ref({ show: false, message: '', type: 'success' });
+      const showToast = (msg, type = 'success') => {
+        toast.value = { show: true, message: msg, type };
+        setTimeout(() => {
+          toast.value.show = false;
+        }, 3000);
+      };
 
       let supabaseClient = null;
 
-      const getTableFromUrl = () => {
+      // 1. 验证 URL Token 与 Supabase table_sessions
+      const verifyTokenAndSession = async () => {
         const params = new URLSearchParams(window.location.search);
-        const table = params.get('table');
-        if (table) currentTable.value = table;
-        const type = params.get('type');
-        if (type) orderType.value = type;
+        const token = params.get('token');
+        const fallbackTable = params.get('table');
+
+        try {
+          const supabaseLib = window.supabase || window.supabaseJs;
+          if (!supabaseLib) throw new Error("Supabase SDK loading failed, please refresh.");
+          supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+          // 若带有 token，优先校验 token
+          if (token) {
+            const { data: session, error } = await supabaseClient
+              .from('table_sessions')
+              .select('*')
+              .eq('id', token)
+              .single();
+
+            if (error || !session) {
+              errorMessage.value = 'Invalid QR code. Please scan table QR code again.';
+              return false;
+            }
+            if (session.status === 'Closed') {
+              errorMessage.value = 'This table session has been closed. QR code expired.';
+              return false;
+            }
+            if (session.expires_at && new Date(session.expires_at) < new Date()) {
+              errorMessage.value = 'QR code session timed out. Please contact counter staff.';
+              return false;
+            }
+
+            // 校验成功，记录桌号
+            sessionToken.value = session.id;
+            currentTable.value = session.table_no;
+            return true;
+          } 
+          // 备用兼容：直接带 ?table=A01
+          else if (fallbackTable) {
+            currentTable.value = fallbackTable;
+            return true;
+          } 
+          else {
+            errorMessage.value = 'No QR code session found. Please scan the QR code on your table.';
+            return false;
+          }
+
+        } catch (err) {
+          errorMessage.value = 'Session verification error: ' + (err.message || 'Network error');
+          console.error(err);
+          return false;
+        }
+      };
+
+      // 确认开桌，解开卡口进入菜单
+      const confirmSession = () => {
+        sessionConfirmed.value = true;
       };
 
       const fetchMenu = async () => {
         try {
-          // 容错获取 Supabase 全局对象
-          const supabaseLib = window.supabase || window.supabaseJs;
-          if (!supabaseLib) {
-            throw new Error("SDK 加载超时，请刷新页面重试！");
+          if (!supabaseClient) {
+            const supabaseLib = window.supabase || window.supabaseJs;
+            supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
           }
 
-          supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+          // 1. 查询菜品列表
+          const { data: menuData, error: menuError } = await supabaseClient
+            .from('menu')
+            .select('*');
 
-          const { data, error } = await supabaseClient.from('menu').select('*');
-          if (error) throw error;
+          if (menuError) throw menuError;
 
-          if (!data || data.length === 0) {
-            errorMessage.value = '数据库中尚无菜单数据，请先在 Supabase 添加菜品。';
+          // 2. 分别查询规格组、子选项和菜单关联表
+          const [groupsRes, optionsRes, relsRes] = await Promise.all([
+            supabaseClient.from('option_groups').select('*'),
+            supabaseClient.from('options').select('*'),
+            supabaseClient.from('dish_option_groups').select('*')
+          ]);
+
+          const groups = groupsRes.data || [];
+          const options = optionsRes.data || [];
+          const rels = relsRes.data || [];
+
+          // 3. 在内存中组合规格数据
+          const groupsMap = {};
+          groups.forEach(g => {
+            groupsMap[g.id] = {
+              id: g.id,
+              name: g.name,
+              options: options.filter(o => String(o.option_group_id) === String(g.id))
+            };
+          });
+
+          // 4. 将规格组绑定回具体的菜品
+          const processedMenu = (menuData || []).map(dish => {
+            const matchedGroupIds = rels
+              .filter(r => String(r.dish_id) === String(dish.id))
+              .map(r => String(r.option_group_id));
+
+            const dishGroups = matchedGroupIds
+              .map(gid => groupsMap[gid])
+              .filter(Boolean);
+
+            return {
+              ...dish,
+              dish_option_groups: dishGroups.map(g => ({ option_groups: g }))
+            };
+          });
+
+          if (!processedMenu || processedMenu.length === 0) {
+            errorMessage.value = 'No menu items found in Supabase.';
           } else {
-            menuList.value = data;
+            menuList.value = processedMenu;
+            if (categories.value.length > 0 && !activeCategory.value) {
+              activeCategory.value = categories.value[0];
+            }
           }
         } catch (err) {
-          errorMessage.value = '连接失败: ' + (err.message || '网络问题');
+          errorMessage.value = 'Connection failed: ' + (err.message || 'Network error');
           console.error(err);
         } finally {
           loading.value = false;
@@ -159,65 +532,165 @@
       };
 
       const categories = computed(() => {
-        const cats = ['全部', ...new Set(menuList.value.map(i => i.category))];
-        return cats;
+        if (!menuList.value.length) return ['All'];
+
+        const allTags = [];
+        menuList.value.forEach(item => {
+          if (item.tags && Array.isArray(item.tags)) {
+            item.tags.forEach(t => { if (t && !allTags.includes(t)) allTags.push(t); });
+          }
+        });
+
+        const dbCategories = [...new Set(menuList.value.map(item => item.category).filter(Boolean))];
+        return [...allTags, ...dbCategories, 'All'];
       });
 
       const filteredMenu = computed(() => {
-        if (activeCategory.value === '全部') return menuList.value;
-        return menuList.value.filter(i => i.category === activeCategory.value);
+        const cat = activeCategory.value;
+        if (!cat || cat === 'All') {
+          return menuList.value;
+        }
+
+        const hasTagMatch = menuList.value.some(i => i.tags && Array.isArray(i.tags) && i.tags.includes(cat));
+        if (hasTagMatch && !menuList.value.some(i => i.category === cat)) {
+          return menuList.value.filter(i => i.tags && Array.isArray(i.tags) && i.tags.includes(cat));
+        }
+
+        return menuList.value.filter(i => i.category === cat);
       });
 
-      const addToCart = (item) => {
-        const existing = cart.value.find(c => c.id === item.id);
-        if (existing) {
-          existing.qty += 1;
+      const activeOptionGroups = computed(() => {
+        if (!selectedItem.value || !selectedItem.value.dish_option_groups) return [];
+        return selectedItem.value.dish_option_groups
+          .map(dog => dog.option_groups)
+          .filter(Boolean);
+      });
+
+      const formatOptionLabel = (opt) => {
+        const price = Number(opt.price || 0);
+        if (price > 0) {
+          return `${opt.name} (+RM ${price.toFixed(2)})`;
+        }
+        return opt.name;
+      };
+
+      const selectOption = (groupName, opt) => {
+        if (selectedCustoms.value[groupName] && selectedCustoms.value[groupName].id === opt.id) {
+          const updated = { ...selectedCustoms.value };
+          delete updated[groupName];
+          selectedCustoms.value = updated;
         } else {
-          cart.value.push({
-            id: item.id,
-            name: item.name,
-            price: Number(item.price),
-            printer: item.printer || 'Kitchen',
-            qty: 1
-          });
+          selectedCustoms.value = {
+            ...selectedCustoms.value,
+            [groupName]: opt
+          };
+        }
+      };
+
+      const isSelected = (groupName, opt) => {
+        const current = selectedCustoms.value[groupName];
+        return current && current.id === opt.id;
+      };
+
+      const calculatedUnitPrice = computed(() => {
+        let base = Number(selectedItem.value.price || 0);
+        Object.values(selectedCustoms.value).forEach(opt => {
+          if (opt && opt.price) {
+            base += Number(opt.price);
+          }
+        });
+        return base;
+      });
+
+      const handleAddToCart = (item) => {
+        if (!item.is_available) return;
+
+        selectedItem.value = item;
+        modalQty.value = 1;
+        itemNote.value = '';
+        selectedCustoms.value = {};
+
+        showItemModal.value = true;
+      };
+
+      const decreaseModalQty = () => {
+        if (modalQty.value > 1) modalQty.value--;
+      };
+
+      const confirmAddToCart = () => {
+        const optionsString = Object.values(selectedCustoms.value)
+          .filter(Boolean)
+          .map(opt => opt.name)
+          .join(' / ');
+
+        cart.value.push({
+          id: selectedItem.value.id,
+          name: selectedItem.value.name,
+          price: calculatedUnitPrice.value,
+          printer: selectedItem.value.printer || 'Kitchen',
+          qty: modalQty.value,
+          selected_options: optionsString,
+          note: itemNote.value
+        });
+        showItemModal.value = false;
+        showToast('Added to cart!', 'success');
+      };
+
+      const updateCartQty = (index, delta) => {
+        cart.value[index].qty += delta;
+        if (cart.value[index].qty <= 0) {
+          cart.value.splice(index, 1);
         }
       };
 
       const totalCartCount = computed(() => cart.value.reduce((sum, item) => sum + item.qty, 0));
       const totalCartPrice = computed(() => cart.value.reduce((sum, item) => sum + (item.price * item.qty), 0));
 
+      // 提交订单（包含 session_id, order_type, pax, 显式声明 is_printed: false）
       const submitOrder = async () => {
-        if (cart.value.length === 0) return;
+        if (cart.value.length === 0 || submitting.value) return;
         submitting.value = true;
 
         try {
+          if (!supabaseClient) {
+            const supabaseLib = window.supabase || window.supabaseJs;
+            if (supabaseLib) supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+            else throw new Error("Database client not initialized.");
+          }
+
+          // 写入 orders 表
           const { error } = await supabaseClient.from('orders').insert([
             {
+              session_id: sessionToken.value || null,
               table_no: currentTable.value,
               order_type: orderType.value,
+              pax: pax.value,
               items: cart.value,
               total_amount: totalCartPrice.value,
-              status: 'Pending'
+              status: 'Pending',
+              pay_method: paymentMethod.value,
+              is_printed: false // 显式写入未打印标记，供后台 app.js 读取出纸
             }
           ]);
 
           if (error) throw error;
 
-          await supabaseClient.from('tables').update({ status: 'Occupied' }).eq('table_no', currentTable.value);
-
-          alert(`✅ 下单成功！订单已发送至柜台与厨房，桌号: ${currentTable.value}`);
+          showToast(`Order placed successfully! Table: ${currentTable.value}`, 'success');
           cart.value = [];
+          showCheckoutModal.value = false;
         } catch (err) {
-          alert('❌ 下单失败: ' + err.message);
+          showToast('Order failed: ' + (err.message || 'Network issue'), 'error');
           console.error(err);
         } finally {
           submitting.value = false;
         }
       };
 
-      onMounted(() => {
-        getTableFromUrl();
-        fetchMenu();
+      onMounted(async () => {
+        const isValid = await verifyTokenAndSession();
+        if (isValid) {
+          await fetchMenu();
+        }
       });
 
       return {
@@ -231,7 +704,29 @@
         cart,
         currentTable,
         orderType,
-        addToCart,
+        pax,
+        sessionToken,
+        sessionConfirmed,
+        showSessionModal,
+        showItemModal,
+        showCartModal,
+        showCheckoutModal,
+        selectedItem,
+        modalQty,
+        paymentMethod,
+        selectedCustoms,
+        itemNote,
+        activeOptionGroups,
+        calculatedUnitPrice,
+        toast,
+        confirmSession,
+        formatOptionLabel,
+        selectOption,
+        isSelected,
+        handleAddToCart,
+        decreaseModalQty,
+        confirmAddToCart,
+        updateCartQty,
         totalCartCount,
         totalCartPrice,
         submitOrder
